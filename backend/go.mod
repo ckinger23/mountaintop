@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.29.16
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.43.3
 	github.com/gorilla/mux v1.8.1
+	github.com/joho/godotenv v1.5.1
 )
 
 require (

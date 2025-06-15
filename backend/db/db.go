@@ -2,45 +2,40 @@ package db
 
 import (
 	"context"
+	"log"
+	"os"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// DBClient wraps DynamoDB client and provides helper methods
-type DBClient struct {
-	Client *dynamodb.Client
+// DatabaseClient defines the interface for database operations
+type DatabaseClient interface {
+	PutItem(ctx context.Context, tableName string, item map[string]types.AttributeValue) error
+	GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error)
+	QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error)
 }
 
-// NewDBClient creates a new DBClient
-func NewDBClient(cfg aws.Config) *DBClient {
-	return &DBClient{
-		Client: dynamodb.NewFromConfig(cfg),
+// NewDBClient creates a new database client based on the environment
+func NewDBClient(cfg aws.Config) DatabaseClient {
+	// Use LocalStack for local development
+	if os.Getenv("ENV") == "local" {
+		// Configure AWS SDK to use LocalStack
+		localCfg := cfg.Copy()
+		localCfg.EndpointResolver = aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				PartitionID:       "aws",
+				URL:               "http://localhost:4566",
+				SigningRegion:     region,
+				HostnameImmutable: true,
+			}, nil
+		})
+
+		log.Println("Using LocalStack DynamoDB for local development")
+		return NewDynamoDBClient(localCfg)
 	}
-}
 
-// PutItem puts an item into DynamoDB
-func (d *DBClient) PutItem(ctx context.Context, tableName string, item map[string]types.AttributeValue) error {
-	_, err := d.Client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(tableName),
-		Item:      item,
-	})
-	return err
-}
-
-// GetItem gets an item from DynamoDB
-func (d *DBClient) GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error) {
-	result, err := d.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(tableName),
-		Key:       key,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return result.Item, nil
-}
-
-// QueryItems queries items from DynamoDB
-func (d *DBClient) QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error) {
-	return d.Client.Query(ctx, input)
+	log.Println("Using AWS DynamoDB for production")
+	return NewDynamoDBClient(cfg)
 }

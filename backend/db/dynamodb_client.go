@@ -1,0 +1,47 @@
+package db
+
+import (
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+// DynamoDBClient implements DatabaseClient for AWS DynamoDB
+type DynamoDBClient struct {
+	client *dynamodb.Client
+}
+
+// NewDynamoDBClient creates a new DynamoDB client
+func NewDynamoDBClient(cfg aws.Config) *DynamoDBClient {
+	return &DynamoDBClient{
+		client: dynamodb.NewFromConfig(cfg),
+	}
+}
+
+// PutItem puts an item into DynamoDB
+func (d *DynamoDBClient) PutItem(ctx context.Context, tableName string, item map[string]types.AttributeValue) error {
+	_, err := d.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(tableName),
+		Item:      item,
+	})
+	return err
+}
+
+// GetItem gets an item from DynamoDB
+func (d *DynamoDBClient) GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error) {
+	result, err := d.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(tableName),
+		Key:       key,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Item, nil
+}
+
+// QueryItems queries items from DynamoDB
+func (d *DynamoDBClient) QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error) {
+	return d.client.Query(ctx, input)
+}
