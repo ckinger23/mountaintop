@@ -1,0 +1,109 @@
+# AWS Deployment Configuration for Football Picking League
+
+# Backend Configuration
+backend:
+  region: us-east-1
+  environment: production
+  services:
+    api:
+      type: AWS Lambda
+      runtime: go1.x
+      memory: 128
+      timeout: 30
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        AWS_REGION: ${AWS_REGION}
+    database:
+      type: DynamoDB
+      tables:
+        - name: FootballPickingLeague
+          attributes:
+            - name: ID
+              type: STRING
+              keyType: HASH
+
+# Frontend Configuration
+frontend:
+  region: us-east-1
+  services:
+    web:
+      type: S3
+      bucketName: football-picking-league-${environment}
+      cloudfront:
+        enabled: true
+        ssl: true
+        certificateArn: ${CERTIFICATE_ARN}
+
+# API Gateway Configuration
+apiGateway:
+  region: us-east-1
+  endpoints:
+    - path: /api/games/{leagueId}
+      method: GET
+      lambda: api
+    - path: /api/picks
+      method: POST
+      lambda: api
+    - path: /api/leaderboard/{leagueId}
+      method: GET
+      lambda: api
+
+# Security Configuration
+security:
+  cognito:
+    enabled: true
+    userPoolName: FootballPickingLeaguePool
+    clientName: FootballPickingLeagueApp
+    authProviders:
+      - type: USER_PASSWORD_AUTH
+      - type: AWS_IAM
+
+# Monitoring Configuration
+monitoring:
+  cloudwatch:
+    enabled: true
+    logRetention: 30
+    metrics:
+      - name: APIRequests
+        unit: Count
+        period: 60
+      - name: ErrorRate
+        unit: Percent
+        period: 60
+
+# CI/CD Configuration
+cicd:
+  pipeline:
+    source:
+      type: GitHub
+      repository: ${GITHUB_REPO}
+      branch: main
+    stages:
+      - name: Build
+        actions:
+          - type: Build
+            buildSpec: buildspec.yml
+      - name: Deploy
+        actions:
+          - type: Deploy
+            service: AWS CloudFormation
+            stackName: FootballPickingLeagueStack
+
+# Resource Limits
+limits:
+  maxLambdaConcurrency: 100
+  maxDynamoDBReadCapacity: 100
+  maxDynamoDBWriteCapacity: 50
+
+# Cost Optimization
+optimization:
+  autoScaling:
+    enabled: true
+    policies:
+      - metric: CPUUtilization
+        target: 70
+      - metric: RequestCount
+        target: 1000
+  reservedInstances:
+    enabled: false
+    evaluationPeriod: 30
