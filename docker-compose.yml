@@ -11,11 +11,61 @@ services:
       - DOCKER_HOST=unix:///var/run/docker.sock
       - DEFAULT_REGION=us-east-1
       - LAMBDA_EXECUTOR=docker-reuse
-      - DATA_DIR=/tmp/localstack/data
-      - PERSISTENCE=1
+      - DATA_DIR=/var/lib/localstack
+      - PERSISTENCE=1           # Enable persistence
+      - HOST_TMP_FOLDER=/tmp/localstack
     volumes:
-      - "localstack-data:/tmp/localstack"
+      - "localstack_data:/var/lib/localstack"  # This named volume will persist data
       - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=local
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+    depends_on:
+      localstack:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8080
+    volumes:
+      - ./frontend/src:/app/src
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
-  localstack-data:
+  localstack_data:
