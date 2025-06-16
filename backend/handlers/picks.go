@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func SubmitPickHandler(dbClient *db.DatabaseClient) http.HandlerFunc {
+func SubmitPickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement DynamoDB put operation
 		utils.RespondWithJSON(w, http.StatusCreated, map[string]string{"status": "success"})

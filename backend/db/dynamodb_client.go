@@ -45,3 +45,8 @@ func (d *DynamoDBClient) GetItem(ctx context.Context, tableName string, key map[
 func (d *DynamoDBClient) QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error) {
 	return d.client.Query(ctx, input)
 }
+
+// Scan scans items from a DynamoDB table
+func (d *DynamoDBClient) Scan(ctx context.Context, input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error) {
+	return d.client.Scan(ctx, input)
+}

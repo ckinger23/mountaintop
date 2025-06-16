@@ -70,22 +70,6 @@ type Pick struct {
 	UpdatedAt time.Time `dynamodbav:"updated_at"`
 }
 
-// TeamStats represents a team's statistics
-type TeamStats struct {
-	TeamID     string `dynamodbav:"team_id"`
-	TeamName   string `dynamodbav:"team_name"`
-	Conference string `dynamodbav:"conference"`
-	Wins       int    `dynamodbav:"wins"`
-	Losses     int    `dynamodbav:"losses"`
-	Points     int    `dynamodbav:"points"`
-}
-
-// ConferenceLeaderboard represents leaderboard by conference
-type ConferenceLeaderboard struct {
-	Conference string      `dynamodbav:"conference"`
-	Teams      []TeamStats `dynamodbav:"teams"`
-}
-
 // LeaderboardEntry represents a user's leaderboard position
 type LeaderboardEntry struct {
 	UserID    string `dynamodbav:"user_id"`

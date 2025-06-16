@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func GetGamesHandler(dbClient *db.DatabaseClient) http.HandlerFunc {
+func GetGamesHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement DynamoDB query
 		utils.RespondWithJSON(w, http.StatusOK, []interface{}{})

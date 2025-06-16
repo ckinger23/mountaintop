@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -63,9 +64,33 @@ func (i *InMemoryClient) GetItem(ctx context.Context, tableName string, key map[
 
 // QueryItems is a basic implementation that would need to be enhanced based on your query needs
 func (i *InMemoryClient) QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error) {
-	// TODO: Implement proper query functionality for in-memory
-	// This is a placeholder that returns an empty result
+	// This is a basic implementation that returns all items in the table
+	// You would need to implement the actual query logic based on the input parameters
 	return &dynamodb.QueryOutput{
 		Items: []map[string]types.AttributeValue{},
+	}, nil
+}
+
+// Scan returns all items in the specified table
+func (i *InMemoryClient) Scan(ctx context.Context, input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
+	tableName := aws.ToString(input.TableName)
+	table, exists := i.tables[tableName]
+	if !exists {
+		return &dynamodb.ScanOutput{
+			Items: []map[string]types.AttributeValue{},
+		}, nil
+	}
+
+	// Convert the map of items to a slice
+	items := make([]map[string]types.AttributeValue, 0, len(table))
+	for _, item := range table {
+		items = append(items, item)
+	}
+
+	return &dynamodb.ScanOutput{
+		Items: items,
 	}, nil
 }
