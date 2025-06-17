@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.36.4
 	github.com/aws/aws-sdk-go-v2/config v1.29.16
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.19.2
+	github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression v1.7.84
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.43.3
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1

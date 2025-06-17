@@ -41,12 +41,52 @@ func (d *DynamoDBClient) GetItem(ctx context.Context, tableName string, key map[
 	return result.Item, nil
 }
 
-// QueryItems queries items from DynamoDB
+// QueryItems queries items from DynamoDB with support for single-table design
 func (d *DynamoDBClient) QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error) {
-	return d.client.Query(ctx, input)
+	// Make a copy of the input to avoid modifying the original
+	queryInput := &dynamodb.QueryInput{
+		TableName:                 input.TableName,
+		IndexName:                 input.IndexName,
+		KeyConditionExpression:    input.KeyConditionExpression,
+		FilterExpression:          input.FilterExpression,
+		ExpressionAttributeNames:  input.ExpressionAttributeNames,
+		ExpressionAttributeValues: input.ExpressionAttributeValues,
+		ExclusiveStartKey:         input.ExclusiveStartKey,
+		Limit:                     input.Limit,
+		ScanIndexForward:          input.ScanIndexForward,
+		ReturnConsumedCapacity:    input.ReturnConsumedCapacity,
+		Select:                    input.Select,
+	}
+
+	// Execute the query
+	result, err := d.client.Query(ctx, queryInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
-// Scan scans items from a DynamoDB table
+// Scan scans items from a DynamoDB table with support for single-table design
 func (d *DynamoDBClient) Scan(ctx context.Context, input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error) {
-	return d.client.Scan(ctx, input)
+	// Make a copy of the input to avoid modifying the original
+	scanInput := &dynamodb.ScanInput{
+		TableName:                input.TableName,
+		IndexName:                input.IndexName,
+		FilterExpression:         input.FilterExpression,
+		ExpressionAttributeNames: input.ExpressionAttributeNames,
+		ExpressionAttributeValues: input.ExpressionAttributeValues,
+		ExclusiveStartKey:        input.ExclusiveStartKey,
+		Limit:                    input.Limit,
+		ReturnConsumedCapacity:   input.ReturnConsumedCapacity,
+		Select:                   input.Select,
+	}
+
+	// Execute the scan
+	result, err := d.client.Scan(ctx, scanInput)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

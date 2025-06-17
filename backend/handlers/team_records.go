@@ -1,18 +1,20 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"os"
 	"sort"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+
 	"football-picking-league/backend/db"
 	"football-picking-league/backend/models"
 	"football-picking-league/backend/utils"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
 // TeamRecord represents a team's record in the API response
@@ -60,24 +62,48 @@ func calculateWinPercentage(wins, losses int) float64 {
 func GetTeamsRecordsHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the table name from environment variables or use a default
-		tableName := os.Getenv("TEAMS_TABLE_NAME")
+		tableName := os.Getenv("DYNAMODB_TABLE")
 		if tableName == "" {
-			tableName = "teams"
+			tableName = "football-picking-league"
 		}
 
-		// Get all teams from the database using Scan operation
-		// Note: For production with large datasets, consider using pagination
-		result, err := dbClient.Scan(r.Context(), &dynamodb.ScanInput{
-			TableName: aws.String(tableName),
+		// Build the query for teams using the GSI-EntityType index
+		// In our single-table design, teams have entity_type = 'TEAM'
+		keyEx := expression.Key("entity_type").Equal(expression.Value("TEAM"))
+		expr, err := expression.NewBuilder().
+			WithKeyCondition(keyEx).
+			Build()
+		if err != nil {
+			log.Printf("Error building query expression: %v", err)
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query expression")
+			return
+		}
+
+		// Query the table using the GSI-EntityType index
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:                 aws.String(tableName),
+			IndexName:                 aws.String("GSI-EntityType"),
+			KeyConditionExpression:    expr.KeyCondition(),
+			ExpressionAttributeNames:  expr.Names(),
+			ExpressionAttributeValues: expr.Values(),
 		})
 		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch teams: "+err.Error())
+			log.Printf("Error querying teams: %v", err)
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch teams")
+			return
+		}
+
+		if result.Items == nil {
+			log.Println("No teams found in the database")
+			utils.RespondWithJSON(w, http.StatusOK, TeamsByConferenceResponse{Conferences: []ConferenceTeams{}})
 			return
 		}
 
 		// Convert the DynamoDB items to Team structs
 		var dbTeams []models.Team
 		for _, item := range result.Items {
+			// Unmarshal the team data
+			// Note: In our single-table design, the team ID is part of the PK (PK = "TEAM#{teamId}")
 			var team models.Team
 			if err := attributevalue.UnmarshalMap(item, &team); err != nil {
 				utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process team data: "+err.Error())
