@@ -2,12 +2,14 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	smithyendpoints "github.com/aws/smithy-go/endpoints"
 )
 
 // DatabaseClient defines the interface for database operations
@@ -18,28 +20,24 @@ type DatabaseClient interface {
 	Scan(ctx context.Context, input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error)
 }
 
+type resolverV2 struct{}
+
+func (*resolverV2) ResolveEndpoint(ctx context.Context, params dynamodb.EndpointParameters) (smithyendpoints.Endpoint, error) {
+	fmt.Printf("The endpoint provided in config is %s\n", *params.Endpoint)
+	return dynamodb.NewDefaultEndpointResolverV2().ResolveEndpoint(ctx, params)
+}
+
 // NewDBClient creates a new database client based on the environment
 func NewDBClient(cfg aws.Config) DatabaseClient {
 	// Use LocalStack for local development
 	if os.Getenv("ENV") == "local" {
-		// Create a custom endpoint resolver for LocalStack
-		customResolver := dynamodb.NewDefaultEndpointResolverV2()
-		_, err := customResolver.ResolveEndpoint(context.TODO(), dynamodb.EndpointParameters{
-			Region: aws.String("us-east-1"),
+		client := dynamodb.NewFromConfig(cfg, func(options *dynamodb.Options) {
+			options.BaseEndpoint = aws.String("http://localhost:4566")
+			options.EndpointResolverV2 = &resolverV2{}
 		})
-		if err != nil {
-			log.Fatalf("unable to resolve endpoint, %v", err)
-		}
-
-		// Create a copy of the config and set the custom endpoint
-		localCfg := cfg.Copy()
-		localCfg.BaseEndpoint = aws.String("http://localhost:4566")
-		localCfg.Region = "us-east-1"
-
-		log.Println("Using LocalStack DynamoDB for local development")
-		return NewDynamoDBClient(localCfg)
+		return NewDynamoDBClientFromClient(client)
 	}
 
 	log.Println("Using AWS DynamoDB for production")
-	return NewDynamoDBClient(cfg)
+	return NewDynamoDBClientFromConfig(cfg)
 }

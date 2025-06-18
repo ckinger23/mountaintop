@@ -14,9 +14,15 @@ type DynamoDBClient struct {
 }
 
 // NewDynamoDBClient creates a new DynamoDB client
-func NewDynamoDBClient(cfg aws.Config) *DynamoDBClient {
+func NewDynamoDBClientFromConfig(cfg aws.Config) *DynamoDBClient {
 	return &DynamoDBClient{
 		client: dynamodb.NewFromConfig(cfg),
+	}
+}
+
+func NewDynamoDBClientFromClient(client *dynamodb.Client) *DynamoDBClient {
+	return &DynamoDBClient{
+		client: client,
 	}
 }
 
@@ -71,15 +77,15 @@ func (d *DynamoDBClient) QueryItems(ctx context.Context, input *dynamodb.QueryIn
 func (d *DynamoDBClient) Scan(ctx context.Context, input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error) {
 	// Make a copy of the input to avoid modifying the original
 	scanInput := &dynamodb.ScanInput{
-		TableName:                input.TableName,
-		IndexName:                input.IndexName,
-		FilterExpression:         input.FilterExpression,
-		ExpressionAttributeNames: input.ExpressionAttributeNames,
+		TableName:                 input.TableName,
+		IndexName:                 input.IndexName,
+		FilterExpression:          input.FilterExpression,
+		ExpressionAttributeNames:  input.ExpressionAttributeNames,
 		ExpressionAttributeValues: input.ExpressionAttributeValues,
-		ExclusiveStartKey:        input.ExclusiveStartKey,
-		Limit:                    input.Limit,
-		ReturnConsumedCapacity:   input.ReturnConsumedCapacity,
-		Select:                   input.Select,
+		ExclusiveStartKey:         input.ExclusiveStartKey,
+		Limit:                     input.Limit,
+		ReturnConsumedCapacity:    input.ReturnConsumedCapacity,
+		Select:                    input.Select,
 	}
 
 	// Execute the scan
