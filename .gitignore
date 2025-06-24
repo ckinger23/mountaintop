@@ -31,3 +31,8 @@ vendor/
 .Trashes
 ehthumbs.db
 Thumbs.db
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/providers/registry.terraform.io/hashicorp/aws/6.0.0/darwin_amd64/terraform-provider-aws_v6.0.0_x5
+.terraform/providers/registry.terraform.io/hashicorp/random/3.7.2/darwin_amd64/terraform-provider-random_v3.7.2_x5

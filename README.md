@@ -197,6 +197,66 @@ curl -X POST http://localhost:4566/ \
   }'
 ```
 
+## Infrastructure as Code with Terraform
+
+This project uses Terraform to manage the LocalStack DynamoDB setup, making it easy to recreate the database schema and test data consistently.
+
+### Terraform Setup
+
+1. **Prerequisites**:
+   - [Terraform](https://www.terraform.io/downloads.html) installed
+   - LocalStack running with DynamoDB service
+   - AWS CLI configured with LocalStack profile
+
+2. **Files**:
+   - `local.tf`: Defines the DynamoDB table structure and GSIs
+   - `test_data.tf`: Contains sample data for testing
+
+3. **Key Features**:
+   - Single-table design with composite keys
+   - Global Secondary Indexes (GSIs) for common query patterns
+   - Sample data including users, teams, conferences, games, and picks
+
+4. **Apply Configuration**:
+   ```bash
+   # Initialize Terraform
+   terraform init
+   
+   # Apply configuration (creates table and test data)
+   terraform apply -auto-approve
+   ```
+
+5. **Data Model**:
+   - **Users**: 5 test users (Carter, Paul, Cal, Nathan, Nick)
+   - **Conferences**: SEC, Big Ten, Big 12, ACC
+   - **Teams**: 16 teams across all conferences
+   - **Games**: 15 games across 5 weeks
+   - **Picks**: Each user has made picks for every game
+
+6. **Query Examples**:
+   ```bash
+   # List all users
+   aws dynamodb scan \
+     --table-name FootballLeague \
+     --filter-expression "entity_type = :type" \
+     --expression-attribute-values '{":type": {"S": "USER"}}' \
+     --endpoint-url http://localhost:4566
+   
+   # Get all games in week 1
+   aws dynamodb query \
+     --table-name FootballLeague \
+     --index-name GSI-EntityType \
+     --key-condition-expression "entity_type = :type AND begins_with(SK, :sk)" \
+     --expression-attribute-values '{":type": {"S": "GAME"}, ":sk": {"S": "WEEK#1"}}' \
+     --endpoint-url http://localhost:4566
+   ```
+
+7. **Clean Up**:
+   ```bash
+   # Destroy all resources (keeps the table but removes all items)
+   terraform destroy -auto-approve
+   ```
+
 ## Manual Setup
 
 ### Backend Setup
