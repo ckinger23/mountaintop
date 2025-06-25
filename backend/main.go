@@ -72,11 +72,44 @@ func main() {
 		w.Write([]byte("Server is healthy"))
 	}).Methods("GET")
 
-	// Register handlers with the database client
-	r.HandleFunc("/api/games/{leagueId}", handlers.GetGamesHandler(dbClient)).Methods("GET")
+	// API routes - Games
+	r.HandleFunc("/api/games/{leagueId}", handlers.GetAllGamesHandler(dbClient)).Methods("GET")
+
+	// API routes - Picks
 	r.HandleFunc("/api/picks", handlers.SubmitPickHandler(dbClient)).Methods("POST")
-	r.HandleFunc("/api/leaderboard/{leagueId}", handlers.GetLeaderboardHandler(dbClient)).Methods("GET")
-	r.HandleFunc("/api/team-records", handlers.GetTeamsRecordsHandler(dbClient)).Methods("GET")
+
+	// API routes - Users
+	r.HandleFunc("/api/users", handlers.GetAllUsersHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/users", handlers.CreateUserHandler(dbClient)).Methods("POST")
+	r.HandleFunc("/api/users/{id}", handlers.GetUserByIDHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/users/username/{username}", handlers.GetUserByUsernameHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/users/email/{email}", handlers.GetUserByEmailHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/users/{id}", handlers.UpdateUserHandler(dbClient)).Methods("PUT")
+	r.HandleFunc("/api/users/{id}", handlers.DeleteUserHandler(dbClient)).Methods("DELETE")
+
+	// API routes - Teams
+	r.HandleFunc("/api/teams", handlers.GetAllTeamsHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/teams/{id}", handlers.GetSingleTeamHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/teams", handlers.CreateTeamHandler(dbClient)).Methods("POST")
+	r.HandleFunc("/api/teams/{id}", handlers.UpdateTeamHandler(dbClient)).Methods("PUT")
+	r.HandleFunc("/api/teams/{id}", handlers.DeleteTeamHandler(dbClient)).Methods("DELETE")
+
+	// API routes - Leagues
+	r.HandleFunc("/api/leagues", handlers.GetAllLeaguesHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/leagues/{id}", handlers.GetLeagueHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/leagues", handlers.CreateLeagueHandler(dbClient)).Methods("POST")
+	r.HandleFunc("/api/leagues/{id}", handlers.UpdateLeagueHandler(dbClient)).Methods("PUT")
+	r.HandleFunc("/api/leagues/{id}", handlers.DeleteLeagueHandler(dbClient)).Methods("DELETE")
+
+	// API routes - Conferences
+	r.HandleFunc("/api/conferences", handlers.GetAllConferencesHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/conferences/{id}", handlers.GetConferenceHandler(dbClient)).Methods("GET")
+	r.HandleFunc("/api/conferences", handlers.CreateConferenceHandler(dbClient)).Methods("POST")
+	r.HandleFunc("/api/conferences/{id}", handlers.UpdateConferenceHandler(dbClient)).Methods("PUT")
+	r.HandleFunc("/api/conferences/{id}", handlers.DeleteConferenceHandler(dbClient)).Methods("DELETE")
+
+	// API routes - Leaderboard Entries
+	r.HandleFunc("/api/leaderboard-entries/week/{week}", handlers.GetLeaderboardEntriesByWeekHandler(dbClient)).Methods("GET")
 
 	// Start server
 	port := ":8080"

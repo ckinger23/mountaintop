@@ -16,6 +16,7 @@ import (
 type DatabaseClient interface {
 	PutItem(ctx context.Context, tableName string, item map[string]types.AttributeValue) error
 	GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error)
+	DeleteItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) error
 	QueryItems(ctx context.Context, input *dynamodb.QueryInput) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, input *dynamodb.ScanInput) (*dynamodb.ScanOutput, error)
 }

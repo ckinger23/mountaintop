@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -25,4 +26,19 @@ func RespondWithError(w http.ResponseWriter, statusCode int, message string) {
 		Success: false,
 		Error:   message,
 	})
+}
+
+// ParseJSONBody parses the JSON body of a request into the target interface
+func ParseJSONBody(r *http.Request, target interface{}) error {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	if err := json.Unmarshal(body, target); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -5,11 +5,13 @@ import (
 	"football-picking-league/backend/utils"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/gorilla/mux"
 )
 
 type Team struct {
@@ -174,5 +176,217 @@ func GetSingleTeamHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		}
 
 		utils.RespondWithJSON(w, http.StatusOK, team)
+	}
+}
+
+// CreateTeamRequest represents the request body for creating a team
+type CreateTeamRequest struct {
+	Name         string `json:"name"`
+	ConferenceID string `json:"conference_id"`
+}
+
+// CreateTeamHandler handles creating a new team
+func CreateTeamHandler(dbClient db.DatabaseClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Only allow POST method
+		if r.Method != http.MethodPost {
+			utils.RespondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+
+		// Parse request body
+		var req CreateTeamRequest
+		if err := utils.ParseJSONBody(r, &req); err != nil {
+			utils.RespondWithError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+			return
+		}
+
+		// Validate required fields
+		if req.Name == "" || req.ConferenceID == "" {
+			utils.RespondWithError(w, http.StatusBadRequest, "Team name and conference ID are required")
+			return
+		}
+
+		// Generate a new team ID
+		teamID := "TEAM#" + strings.ReplaceAll(req.Name, " ", "_")
+
+		// Create the team item for DynamoDB
+		item := map[string]types.AttributeValue{
+			"PK":            &types.AttributeValueMemberS{Value: teamID},
+			"SK":            &types.AttributeValueMemberS{Value: "METADATA"},
+			"entity_type":   &types.AttributeValueMemberS{Value: "TEAM"},
+			"id":            &types.AttributeValueMemberS{Value: teamID},
+			"conference_id": &types.AttributeValueMemberS{Value: req.ConferenceID},
+			"data": &types.AttributeValueMemberM{
+				Value: map[string]types.AttributeValue{
+					"name": &types.AttributeValueMemberS{Value: req.Name},
+				},
+			},
+		}
+
+		// Save the team to DynamoDB
+		if err := dbClient.PutItem(r.Context(), "FootballLeague", item); err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create team: "+err.Error())
+			return
+		}
+
+		// Return the created team
+		team := Team{
+			ID:           teamID,
+			Name:         req.Name,
+			ConferenceID: req.ConferenceID,
+		}
+
+		utils.RespondWithJSON(w, http.StatusCreated, team)
+	}
+}
+
+// UpdateTeamRequest represents the request body for updating a team
+type UpdateTeamRequest struct {
+	Name         *string `json:"name,omitempty"`
+	ConferenceID *string `json:"conference_id,omitempty"`
+}
+
+// UpdateTeamHandler handles updating a team
+func UpdateTeamHandler(dbClient db.DatabaseClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the ID from the URL parameters
+		vars := mux.Vars(r)
+		id := vars["id"]
+		if id == "" {
+			utils.RespondWithError(w, http.StatusBadRequest, "Team ID is required")
+			return
+		}
+
+		// Get the existing team first
+		key := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: "TEAM#" + id},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+		}
+
+		existingItem, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch team")
+			return
+		}
+
+		if len(existingItem) == 0 {
+			utils.RespondWithError(w, http.StatusNotFound, "Team not found")
+			return
+		}
+
+		// Parse the request body
+		var req UpdateTeamRequest
+		if err := utils.ParseJSONBody(r, &req); err != nil {
+			utils.RespondWithError(w, http.StatusBadRequest, "Invalid request body: "+err.Error())
+			return
+		}
+
+		// Check if at least one field is being updated
+		if req.Name == nil && req.ConferenceID == nil {
+			utils.RespondWithError(w, http.StatusBadRequest, "No fields to update")
+			return
+		}
+
+		// Get existing data
+		var existingData map[string]types.AttributeValue
+		if data, ok := existingItem["data"].(*types.AttributeValueMemberM); ok {
+			existingData = data.Value
+		} else {
+			existingData = make(map[string]types.AttributeValue)
+		}
+
+		// Update the fields if they are provided in the request
+		if req.Name != nil {
+			existingData["name"] = &types.AttributeValueMemberS{Value: *req.Name}
+		}
+
+		// Prepare the updated item
+		updatedAt := time.Now().Format(time.RFC3339)
+		item := map[string]types.AttributeValue{
+			"PK":            key["PK"],
+			"SK":            key["SK"],
+			"entity_type":   &types.AttributeValueMemberS{Value: "TEAM"},
+			"id":            &types.AttributeValueMemberS{Value: id},
+			"conference_id": existingItem["conference_id"],
+			"updated_at":    &types.AttributeValueMemberS{Value: updatedAt},
+			"data":          &types.AttributeValueMemberM{Value: existingData},
+		}
+
+		// Update conference_id if provided
+		if req.ConferenceID != nil {
+			item["conference_id"] = &types.AttributeValueMemberS{Value: *req.ConferenceID}
+		}
+
+		// Save the updated team to DynamoDB
+		if err := dbClient.PutItem(r.Context(), "FootballLeague", item); err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to update team: "+err.Error())
+			return
+		}
+
+		// Get the updated name (either new or existing)
+		updatedName := ""
+		if req.Name != nil {
+			updatedName = *req.Name
+		} else if name, ok := existingData["name"].(*types.AttributeValueMemberS); ok {
+			updatedName = name.Value
+		}
+
+		// Get the updated conference ID (either new or existing)
+		updatedConfID := ""
+		if req.ConferenceID != nil {
+			updatedConfID = *req.ConferenceID
+		} else if confID, ok := existingItem["conference_id"].(*types.AttributeValueMemberS); ok {
+			updatedConfID = confID.Value
+		}
+
+		// Return the updated team
+		utils.RespondWithJSON(w, http.StatusOK, Team{
+			ID:           id,
+			Name:         updatedName,
+			ConferenceID: updatedConfID,
+		})
+	}
+}
+
+// DeleteTeamHandler handles deleting a team by ID
+func DeleteTeamHandler(dbClient db.DatabaseClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Only allow DELETE method
+		if r.Method != http.MethodDelete {
+			utils.RespondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
+			return
+		}
+
+		// Get team ID from query parameters
+		teamID := r.URL.Query().Get("id")
+		if teamID == "" {
+			utils.RespondWithError(w, http.StatusBadRequest, "Team ID is required")
+			return
+		}
+
+		// Create the key for the team item
+		key := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: teamID},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+		}
+
+		// First check if the team exists
+		_, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusNotFound, "Team not found")
+			return
+		}
+
+		// Delete the team from DynamoDB
+		if err := dbClient.DeleteItem(r.Context(), "FootballLeague", key); err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete team: "+err.Error())
+			return
+		}
+
+		// Return success response
+		utils.RespondWithJSON(w, http.StatusOK, map[string]string{
+			"message": "Team deleted successfully",
+		})
 	}
 }

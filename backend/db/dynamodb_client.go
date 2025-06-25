@@ -35,6 +35,15 @@ func (d *DynamoDBClient) PutItem(ctx context.Context, tableName string, item map
 	return err
 }
 
+// DeleteItem deletes an item from DynamoDB
+func (d *DynamoDBClient) DeleteItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) error {
+	_, err := d.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(tableName),
+		Key:       key,
+	})
+	return err
+}
+
 // GetItem gets an item from DynamoDB
 func (d *DynamoDBClient) GetItem(ctx context.Context, tableName string, key map[string]types.AttributeValue) (map[string]types.AttributeValue, error) {
 	result, err := d.client.GetItem(ctx, &dynamodb.GetItemInput{
