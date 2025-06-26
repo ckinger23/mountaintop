@@ -35,58 +35,75 @@ resource "aws_dynamodb_table" "football_league" {
   }
 
   attribute {
-    name = "id"
+    name = "GSI1_PK"
     type = "S"
   }
 
   attribute {
-    name = "user_id"
+    name = "GSI1_SK"
     type = "S"
   }
 
   attribute {
-    name = "week"
+    name = "GSI2_PK"
     type = "S"
   }
 
   attribute {
-    name = "game_id"
+    name = "GSI2_SK"
     type = "S"
   }
 
   attribute {
-    name = "pick"
+    name = "GSI3_PK"
     type = "S"
   }
 
-  # GSI-EntityType: entity_type as the partition key, id as the sort key
+  attribute {
+    name = "GSI3_SK"
+    type = "S"
+  }
+
+  attribute {
+    name = "GSI4_PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "GSI4_SK"
+    type = "S"
+  }
+
+  # GSI1: Entity lookup by type and alternate keys (username, email, name)
   global_secondary_index {
-    name               = "GSI-EntityType"
-    hash_key           = "entity_type"
-    range_key          = "id"
+    name               = "GSI1-EntityLookup"
+    hash_key           = "GSI1_PK"
+    range_key          = "GSI1_SK"
     projection_type    = "ALL"
-    read_capacity     = 5
-    write_capacity    = 5
   }
 
-  # GSI-UserPicks: user_id as the partition key, week as the sort key
+  # GSI2: League and Week based queries (games by week, picks by league/week)
   global_secondary_index {
-    name               = "GSI-UserPicks"
-    hash_key           = "user_id"
-    range_key          = "week"
+    name               = "GSI2-LeagueWeek"
+    hash_key           = "GSI2_PK"
+    range_key          = "GSI2_SK"
     projection_type    = "ALL"
-    read_capacity     = 5
-    write_capacity    = 5
   }
 
-  # GSI-GamePicks: game_id as the partition key, pick as the sort key
+  # GSI3: User-based queries (user picks by season/week)
   global_secondary_index {
-    name               = "GSI-GamePicks"
-    hash_key           = "game_id"
-    range_key          = "pick"
+    name               = "GSI3-UserQueries"
+    hash_key           = "GSI3_PK"
+    range_key          = "GSI3_SK"
     projection_type    = "ALL"
-    read_capacity     = 5
-    write_capacity    = 5
+  }
+
+  # GSI4: Game-based queries (all picks for a game)
+  global_secondary_index {
+    name               = "GSI4-GameQueries"
+    hash_key           = "GSI4_PK"
+    range_key          = "GSI4_SK"
+    projection_type    = "ALL"
   }
 
   # Enable TTL if needed

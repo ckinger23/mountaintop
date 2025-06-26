@@ -159,7 +159,7 @@ func GetGameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		// Create the key for the query
 		key := map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"SK": &types.AttributeValueMemberS{Value: "METADATA#" + gameID},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
 		}
 
 		// Get the item from DynamoDB
@@ -271,8 +271,8 @@ func CreateGameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		item := map[string]types.AttributeValue{
 			"PK":          &types.AttributeValueMemberS{Value: "LEAGUE#" + req.LeagueID},
 			"SK":          &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"GSI1PK":      &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"GSI1SK":      &types.AttributeValueMemberS{Value: "METADATA#" + gameID},
+			"GSI1_PK":     &types.AttributeValueMemberS{Value: "GAME"},
+			"GSI1_SK":     &types.AttributeValueMemberS{Value: "GAME#" + gameID},
 			"entity_type": &types.AttributeValueMemberS{Value: "GAME"},
 			"id":          &types.AttributeValueMemberS{Value: gameID},
 			"league_id":   &types.AttributeValueMemberS{Value: req.LeagueID},
@@ -347,8 +347,8 @@ func UpdateGameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Get the existing game to update
 		key := map[string]types.AttributeValue{
-			"GSI1PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"GSI1SK": &types.AttributeValueMemberS{Value: "METADATA#" + gameID},
+			"PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
 		}
 
 		// Get the existing game
@@ -487,8 +487,8 @@ func DeleteGameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// First, get the game to find its league ID
 		key := map[string]types.AttributeValue{
-			"GSI1PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"GSI1SK": &types.AttributeValueMemberS{Value: "METADATA#" + gameID},
+			"PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
 		}
 
 		// Get the game to find its league ID

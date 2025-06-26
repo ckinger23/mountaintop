@@ -31,22 +31,14 @@ type TeamsResponse struct {
 
 func GetAllTeamsHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Build the query to get all teams
-		expr, err := expression.NewBuilder().
-			WithKeyCondition(expression.Key("entity_type").Equal(expression.Value("TEAM"))).
-			Build()
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query")
-			return
-		}
-
-		// Query the table using the GSI-EntityType index
+		// Query the table using GSI1-EntityLookup to get all teams
 		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
-			TableName:                 aws.String("FootballLeague"),
-			IndexName:                 aws.String("GSI-EntityType"),
-			KeyConditionExpression:    expr.KeyCondition(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "TEAM"},
+			},
 		})
 
 		if err != nil {
@@ -134,7 +126,7 @@ func GetSingleTeamHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Query DynamoDB
 		result, err := dbClient.Scan(r.Context(), &dynamodb.ScanInput{
-			TableName:                 aws.String("teams"),
+			TableName:                 aws.String("FootballLeague"),
 			FilterExpression:          expr.Filter(),
 			ExpressionAttributeNames:  expr.Names(),
 			ExpressionAttributeValues: expr.Values(),
@@ -214,6 +206,8 @@ func CreateTeamHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		item := map[string]types.AttributeValue{
 			"PK":            &types.AttributeValueMemberS{Value: teamID},
 			"SK":            &types.AttributeValueMemberS{Value: "METADATA"},
+			"GSI1_PK":       &types.AttributeValueMemberS{Value: "TEAM"},
+			"GSI1_SK":       &types.AttributeValueMemberS{Value: teamID},
 			"entity_type":   &types.AttributeValueMemberS{Value: "TEAM"},
 			"id":            &types.AttributeValueMemberS{Value: teamID},
 			"conference_id": &types.AttributeValueMemberS{Value: req.ConferenceID},

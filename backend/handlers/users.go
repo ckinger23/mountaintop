@@ -40,22 +40,14 @@ type UsersResponse struct {
 // GetAllUsersHandler returns a list of all users
 func GetAllUsersHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Build the query to get all users
-		expr, err := expression.NewBuilder().
-			WithKeyCondition(expression.Key("entity_type").Equal(expression.Value(entityTypePK))).
-			Build()
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query")
-			return
-		}
-
-		// Query the table using the GSI-EntityType index
+		// Query the table using GSI1 to get all users
 		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
-			TableName:                 aws.String(tableName),
-			IndexName:                 aws.String("GSI-EntityType"),
-			KeyConditionExpression:    expr.KeyCondition(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
+			TableName: aws.String(tableName),
+			IndexName: aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "USER"},
+			},
 		})
 
 		if err != nil {
@@ -108,7 +100,7 @@ func GetUserByIDHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		// Create the key for the query
 		key := map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{Value: "USER#" + id},
-			"SK": &types.AttributeValueMemberS{Value: "PROFILE#" + id},
+			"SK": &types.AttributeValueMemberS{Value: "PROFILE"},
 		}
 
 		// Get the item from DynamoDB
@@ -157,41 +149,57 @@ func GetUserByUsernameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Build the filter expression for username
-		filt := expression.Name("data.username").Equal(expression.Value(strings.ToLower(username))).
-			And(expression.Name("entity_type").Equal(expression.Value(entityTypePK)))
+		// First, look up the user ID using the username lookup table
+		lookupKey := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: "USERNAME#" + username},
+			"SK": &types.AttributeValueMemberS{Value: "LOOKUP"},
+		}
 
-		expr, err := expression.NewBuilder().WithFilter(filt).Build()
+		lookupItem, err := dbClient.GetItem(r.Context(), tableName, lookupKey)
 		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query")
+			utils.RespondWithError(w, http.StatusInternalServerError, "Error looking up username")
 			return
 		}
 
-		// Create the scan input
-		input := &dynamodb.ScanInput{
-			TableName:                 aws.String(tableName),
-			FilterExpression:          expr.Filter(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
-			Limit:                     aws.Int32(1), // Usernames should be unique
+		if len(lookupItem) == 0 {
+			utils.RespondWithError(w, http.StatusNotFound, "User not found")
+			return
 		}
 
-		// Execute the scan
-		result, err := dbClient.Scan(r.Context(), input)
+		// Get the user ID from the lookup result
+		userIDAttr, ok := lookupItem["user_id"].(*types.AttributeValueMemberS)
+		if !ok {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid lookup data")
+			return
+		}
+		userID := userIDAttr.Value
+
+		// Now get the actual user data
+		userKey := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "PROFILE"},
+		}
+
+		userItem, err := dbClient.GetItem(r.Context(), tableName, userKey)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving user")
+			return
+		}
+
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving user")
 			return
 		}
 
 		// If no user found
-		if len(result.Items) == 0 {
+		if len(userItem) == 0 {
 			utils.RespondWithError(w, http.StatusNotFound, "User not found")
 			return
 		}
 
-		// Unmarshal the first item
+		// Unmarshal the user data
 		var user models.User
-		if data, ok := result.Items[0]["data"].(*types.AttributeValueMemberM); ok {
+		if data, ok := userItem["data"].(*types.AttributeValueMemberM); ok {
 			err = attributevalue.UnmarshalMap(data.Value, &user)
 			if err != nil {
 				utils.RespondWithError(w, http.StatusInternalServerError, "Error processing user data")
@@ -222,41 +230,57 @@ func GetUserByEmailHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Build the filter expression for email
-		filt := expression.Name("data.email").Equal(expression.Value(strings.ToLower(email))).
-			And(expression.Name("entity_type").Equal(expression.Value(entityTypePK)))
+		// First, look up the user ID using the email lookup table
+		lookupKey := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: "EMAIL#" + strings.ToLower(email)},
+			"SK": &types.AttributeValueMemberS{Value: "LOOKUP"},
+		}
 
-		expr, err := expression.NewBuilder().WithFilter(filt).Build()
+		lookupItem, err := dbClient.GetItem(r.Context(), tableName, lookupKey)
 		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query")
+			utils.RespondWithError(w, http.StatusInternalServerError, "Error looking up email")
 			return
 		}
 
-		// Create the scan input
-		input := &dynamodb.ScanInput{
-			TableName:                 aws.String(tableName),
-			FilterExpression:          expr.Filter(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
-			Limit:                     aws.Int32(1), // Emails should be unique
+		if len(lookupItem) == 0 {
+			utils.RespondWithError(w, http.StatusNotFound, "User not found")
+			return
 		}
 
-		// Execute the scan
-		result, err := dbClient.Scan(r.Context(), input)
+		// Get the user ID from the lookup result
+		userIDAttr, ok := lookupItem["user_id"].(*types.AttributeValueMemberS)
+		if !ok {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid lookup data")
+			return
+		}
+		userID := userIDAttr.Value
+
+		// Now get the actual user data
+		userKey := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "PROFILE"},
+		}
+
+		userItem, err := dbClient.GetItem(r.Context(), tableName, userKey)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving user")
+			return
+		}
+
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Error retrieving user")
 			return
 		}
 
 		// If no user found
-		if len(result.Items) == 0 {
+		if len(userItem) == 0 {
 			utils.RespondWithError(w, http.StatusNotFound, "User not found")
 			return
 		}
 
-		// Unmarshal the first item
+		// Unmarshal the user data
 		var user models.User
-		if data, ok := result.Items[0]["data"].(*types.AttributeValueMemberM); ok {
+		if data, ok := userItem["data"].(*types.AttributeValueMemberM); ok {
 			err = attributevalue.UnmarshalMap(data.Value, &user)
 			if err != nil {
 				utils.RespondWithError(w, http.StatusInternalServerError, "Error processing user data")
@@ -336,7 +360,9 @@ func CreateUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		// Prepare the item for DynamoDB
 		item := map[string]types.AttributeValue{
 			"PK":           &types.AttributeValueMemberS{Value: "USER#" + user.ID},
-			"SK":           &types.AttributeValueMemberS{Value: "PROFILE#" + user.ID},
+			"SK":           &types.AttributeValueMemberS{Value: "PROFILE"},
+			"GSI1_PK":      &types.AttributeValueMemberS{Value: "USER"},
+			"GSI1_SK":      &types.AttributeValueMemberS{Value: "USER#" + user.ID},
 			"entity_type":  &types.AttributeValueMemberS{Value: entityTypePK},
 			"created_at":   &types.AttributeValueMemberS{Value: user.CreatedAt.Format(time.RFC3339)},
 			"updated_at":   &types.AttributeValueMemberS{Value: user.UpdatedAt.Format(time.RFC3339)},
@@ -349,10 +375,34 @@ func CreateUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			},
 		}
 
-		// Put item in DynamoDB
+		// Put main user item in DynamoDB
 		err := dbClient.PutItem(r.Context(), tableName, item)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create user")
+			return
+		}
+
+		// Create username lookup record
+		usernameItem := map[string]types.AttributeValue{
+			"PK":      &types.AttributeValueMemberS{Value: "USERNAME#" + user.Username},
+			"SK":      &types.AttributeValueMemberS{Value: "LOOKUP"},
+			"user_id": &types.AttributeValueMemberS{Value: user.ID},
+		}
+		err = dbClient.PutItem(r.Context(), tableName, usernameItem)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create username lookup")
+			return
+		}
+
+		// Create email lookup record
+		emailItem := map[string]types.AttributeValue{
+			"PK":      &types.AttributeValueMemberS{Value: "EMAIL#" + user.Email},
+			"SK":      &types.AttributeValueMemberS{Value: "LOOKUP"},
+			"user_id": &types.AttributeValueMemberS{Value: user.ID},
+		}
+		err = dbClient.PutItem(r.Context(), tableName, emailItem)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create email lookup")
 			return
 		}
 
@@ -399,7 +449,7 @@ func UpdateUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		// Get the existing user first
 		key := map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{Value: "USER#" + id},
-			"SK": &types.AttributeValueMemberS{Value: "PROFILE#" + id},
+			"SK": &types.AttributeValueMemberS{Value: "PROFILE"},
 		}
 
 		existingItem, err := dbClient.GetItem(r.Context(), tableName, key)
@@ -446,6 +496,8 @@ func UpdateUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		item := map[string]types.AttributeValue{
 			"PK":           key["PK"],
 			"SK":           key["SK"],
+			"GSI1_PK":      &types.AttributeValueMemberS{Value: "USER"},
+			"GSI1_SK":      &types.AttributeValueMemberS{Value: "USER#" + id},
 			"entity_type":  &types.AttributeValueMemberS{Value: entityTypePK},
 			"id":           &types.AttributeValueMemberS{Value: id},
 			"updated_at":   &types.AttributeValueMemberS{Value: updatedAt.Format(time.RFC3339)},
@@ -517,7 +569,7 @@ func DeleteUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		// First check if user exists
 		key := map[string]types.AttributeValue{
 			"PK": &types.AttributeValueMemberS{Value: "USER#" + id},
-			"SK": &types.AttributeValueMemberS{Value: "PROFILE#" + id},
+			"SK": &types.AttributeValueMemberS{Value: "PROFILE"},
 		}
 
 		// Get the item to verify it exists and get the email for cleanup

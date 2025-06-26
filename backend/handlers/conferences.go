@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/gorilla/mux"
@@ -47,8 +46,8 @@ func GetConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Create the key for the query
 		key := map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: "CONF#" + id},
-			"SK": &types.AttributeValueMemberS{Value: "METADATA#" + id},
+			"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#" + id},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
 		}
 
 		// Get the item from DynamoDB
@@ -90,22 +89,14 @@ func GetConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 // GetAllConferencesHandler returns a list of all conferences
 func GetAllConferencesHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Build the query to get all conferences
-		expr, err := expression.NewBuilder().
-			WithKeyCondition(expression.Key("entity_type").Equal(expression.Value("CONFERENCE"))).
-			Build()
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query")
-			return
-		}
-
-		// Query the table using the GSI-EntityType index
+		// Query the table using GSI1-EntityLookup to get all conferences
 		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
-			TableName:                 aws.String("FootballLeague"),
-			IndexName:                 aws.String("GSI-EntityType"),
-			KeyConditionExpression:    expr.KeyCondition(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+			},
 		})
 
 		if err != nil {
@@ -160,7 +151,7 @@ func CreateConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		}
 
 		// Validate required fields
-		if req.Name == "" {
+		if strings.TrimSpace(req.Name) == "" {
 			utils.RespondWithError(w, http.StatusBadRequest, "Conference name is required")
 			return
 		}
@@ -185,8 +176,10 @@ func CreateConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Create the item to save
 		item := map[string]types.AttributeValue{
-			"PK":          &types.AttributeValueMemberS{Value: "CONF#" + conferenceID},
-			"SK":          &types.AttributeValueMemberS{Value: "METADATA#" + conferenceID},
+			"PK":          &types.AttributeValueMemberS{Value: "CONFERENCE#" + conferenceID},
+			"SK":          &types.AttributeValueMemberS{Value: "METADATA"},
+			"GSI1_PK":     &types.AttributeValueMemberS{Value: "CONFERENCE"},
+			"GSI1_SK":     &types.AttributeValueMemberS{Value: "CONFERENCE#" + conferenceID},
 			"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
 			"id":          &types.AttributeValueMemberS{Value: conferenceID},
 			"created_at":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
@@ -223,8 +216,8 @@ func UpdateConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Get the existing conference first
 		key := map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: "CONF#" + id},
-			"SK": &types.AttributeValueMemberS{Value: "METADATA#" + id},
+			"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#" + id},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
 		}
 
 		existingItem, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
@@ -241,7 +234,7 @@ func UpdateConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		}
 
 		// Validate required fields
-		if req.Name == "" {
+		if strings.TrimSpace(req.Name) == "" {
 			utils.RespondWithError(w, http.StatusBadRequest, "Conference name is required")
 			return
 		}
@@ -313,8 +306,8 @@ func DeleteConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Create the key for the conference item
 		key := map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: "CONF#" + conferenceID},
-			"SK": &types.AttributeValueMemberS{Value: "METADATA#" + conferenceID},
+			"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#" + conferenceID},
+			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
 		}
 
 		// First check if the conference exists
