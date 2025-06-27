@@ -7,11 +7,11 @@ import (
 	"football-picking-league/backend/models"
 	"football-picking-league/backend/utils"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
@@ -95,22 +95,28 @@ func SubmitPickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Check if pick already exists for this user and game
-		existingPicks, err := getPicksByUserAndGame(dbClient, r.Context(), req.UserID, req.GameID)
+		// Check if pick already exists for this user and game using efficient GSI query
+		key := map[string]types.AttributeValue{
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + req.UserID},
+			"SK": &types.AttributeValueMemberS{Value: "PICK#" + req.GameID},
+		}
+
+		existingItem, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to check existing picks: "+err.Error())
 			return
 		}
 
-		if len(existingPicks) > 0 {
+		if len(existingItem) > 0 {
 			utils.RespondWithError(w, http.StatusConflict, "A pick already exists for this user and game")
 			return
 		}
 
 		// Create new pick
 		now := time.Now()
+		pickID := uuid.New().String()
 		pick := models.Pick{
-			ID:        uuid.New().String(),
+			ID:        pickID,
 			UserID:    req.UserID,
 			GameID:    req.GameID,
 			Week:      req.Week,
@@ -121,15 +127,35 @@ func SubmitPickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			UpdatedAt: now,
 		}
 
-		// Convert to DynamoDB item
-		item, err := attributevalue.MarshalMap(pick)
+		// Marshal the pick data
+		data, err := attributevalue.MarshalMap(pick)
 		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to marshal pick: "+err.Error())
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process pick data")
 			return
 		}
 
+		// Create the item to save using single table design
+		item := map[string]types.AttributeValue{
+			"PK":          &types.AttributeValueMemberS{Value: "USER#" + req.UserID},
+			"SK":          &types.AttributeValueMemberS{Value: "PICK#" + req.GameID},
+			"GSI1_PK":     &types.AttributeValueMemberS{Value: "PICK"},
+			"GSI1_SK":     &types.AttributeValueMemberS{Value: "PICK#" + pickID},
+			"GSI2_PK":     &types.AttributeValueMemberS{Value: "WEEK#" + strconv.Itoa(req.Week)},
+			"GSI2_SK":     &types.AttributeValueMemberS{Value: "USER#" + req.UserID},
+			"entity_type": &types.AttributeValueMemberS{Value: "PICK"},
+			"id":          &types.AttributeValueMemberS{Value: pickID},
+			"user_id":     &types.AttributeValueMemberS{Value: req.UserID},
+			"game_id":     &types.AttributeValueMemberS{Value: req.GameID},
+			"week":        &types.AttributeValueMemberN{Value: strconv.Itoa(req.Week)},
+			"status":      &types.AttributeValueMemberS{Value: "pending"},
+			"points":      &types.AttributeValueMemberN{Value: "0"},
+			"created_at":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+			"updated_at":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+			"data":        &types.AttributeValueMemberM{Value: data},
+		}
+
 		// Add the pick to DynamoDB
-		if err := dbClient.PutItem(r.Context(), "Picks", item); err != nil {
+		if err := dbClient.PutItem(r.Context(), "FootballLeague", item); err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to save pick: "+err.Error())
 			return
 		}
@@ -148,27 +174,38 @@ func GetPickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Create the key for the query
-		key := map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: pickID},
-		}
+		// Use GSI1 to find pick by ID efficiently
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk AND GSI1_SK = :sk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "PICK"},
+				":sk": &types.AttributeValueMemberS{Value: "PICK#" + pickID},
+			},
+			Limit: aws.Int32(1),
+		})
 
-		// Get the item from DynamoDB
-		result, err := dbClient.GetItem(r.Context(), "Picks", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to get pick: "+err.Error())
 			return
 		}
 
-		if len(result) == 0 {
+		if len(result.Items) == 0 {
 			utils.RespondWithError(w, http.StatusNotFound, "Pick not found")
 			return
 		}
 
 		// Unmarshal the result into a Pick
 		var pick models.Pick
-		if err := attributevalue.UnmarshalMap(result, &pick); err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process pick data: "+err.Error())
+		if data, ok := result.Items[0]["data"].(*types.AttributeValueMemberM); ok {
+			err = attributevalue.UnmarshalMap(data.Value, &pick)
+			if err != nil {
+				utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process pick data: "+err.Error())
+				return
+			}
+		} else {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid pick data format")
 			return
 		}
 
@@ -179,9 +216,14 @@ func GetPickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 func GetAllPicksHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Scan the entire Picks table
-		result, err := dbClient.Scan(r.Context(), &dynamodb.ScanInput{
-			TableName: aws.String("Picks"),
+		// Use GSI1 to efficiently get all picks
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "PICK"},
+			},
 		})
 
 		if err != nil {
@@ -189,11 +231,16 @@ func GetAllPicksHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Unmarshal the results
+		// Process the results
 		var picks []models.Pick
-		if err := attributevalue.UnmarshalListOfMaps(result.Items, &picks); err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process picks: "+err.Error())
-			return
+		for _, item := range result.Items {
+			if data, ok := item["data"].(*types.AttributeValueMemberM); ok {
+				var pick models.Pick
+				err = attributevalue.UnmarshalMap(data.Value, &pick)
+				if err == nil {
+					picks = append(picks, pick)
+				}
+			}
 		}
 
 		// Convert to response format
@@ -218,21 +265,14 @@ func GetAllPicksByUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Build the query
-		expr, err := expression.NewBuilder().
-			WithKeyCondition(expression.Key("user_id").Equal(expression.Value(userID))).
-			Build()
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query: "+err.Error())
-			return
-		}
-
-		// Query the Picks table
+		// Query using main table for user's picks efficiently
 		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
-			TableName:                 aws.String("Picks"),
-			KeyConditionExpression:    expr.KeyCondition(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
+			TableName:              aws.String("FootballLeague"),
+			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "USER#" + userID},
+				":sk": &types.AttributeValueMemberS{Value: "PICK#"},
+			},
 		})
 
 		if err != nil {
@@ -240,11 +280,16 @@ func GetAllPicksByUserHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Unmarshal the results
+		// Process the results
 		var picks []models.Pick
-		if err := attributevalue.UnmarshalListOfMaps(result.Items, &picks); err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process picks: "+err.Error())
-			return
+		for _, item := range result.Items {
+			if data, ok := item["data"].(*types.AttributeValueMemberM); ok {
+				var pick models.Pick
+				err = attributevalue.UnmarshalMap(data.Value, &pick)
+				if err == nil {
+					picks = append(picks, pick)
+				}
+			}
 		}
 
 		// Convert to response format
@@ -269,21 +314,14 @@ func GetAllPicksByWeekHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Build the query
-		expr, err := expression.NewBuilder().
-			WithFilter(expression.Name("week").Equal(expression.Value(week))).
-			Build()
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to build query: "+err.Error())
-			return
-		}
-
-		// Scan the Picks table with filter
-		result, err := dbClient.Scan(r.Context(), &dynamodb.ScanInput{
-			TableName:                 aws.String("Picks"),
-			FilterExpression:          expr.Filter(),
-			ExpressionAttributeNames:  expr.Names(),
-			ExpressionAttributeValues: expr.Values(),
+		// Use GSI2 to efficiently query picks by week
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI2-UserPicks"),
+			KeyConditionExpression: aws.String("GSI2_PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "WEEK#" + week},
+			},
 		})
 
 		if err != nil {
@@ -291,11 +329,16 @@ func GetAllPicksByWeekHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Unmarshal the results
+		// Process the results
 		var picks []models.Pick
-		if err := attributevalue.UnmarshalListOfMaps(result.Items, &picks); err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process picks: "+err.Error())
-			return
+		for _, item := range result.Items {
+			if data, ok := item["data"].(*types.AttributeValueMemberM); ok {
+				var pick models.Pick
+				err = attributevalue.UnmarshalMap(data.Value, &pick)
+				if err == nil {
+					picks = append(picks, pick)
+				}
+			}
 		}
 
 		// Convert to response format
@@ -317,10 +360,11 @@ func UpdatePickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Get pick ID from URL parameters
-		pickID := r.URL.Query().Get("id")
-		if pickID == "" {
-			utils.RespondWithError(w, http.StatusBadRequest, "Pick ID is required")
+		// Get user ID and game ID from URL parameters
+		userID := r.URL.Query().Get("user_id")
+		gameID := r.URL.Query().Get("game_id")
+		if userID == "" || gameID == "" {
+			utils.RespondWithError(w, http.StatusBadRequest, "User ID and Game ID are required")
 			return
 		}
 
@@ -337,12 +381,13 @@ func UpdatePickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// First, get the existing pick
+		// Get the existing pick using efficient key
 		key := map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: pickID},
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "PICK#" + gameID},
 		}
 
-		result, err := dbClient.GetItem(r.Context(), "Picks", key)
+		result, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to get pick: "+err.Error())
 			return
@@ -355,8 +400,14 @@ func UpdatePickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 
 		// Unmarshal the existing pick
 		var existingPick models.Pick
-		if err := attributevalue.UnmarshalMap(result, &existingPick); err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process pick data: "+err.Error())
+		if data, ok := result["data"].(*types.AttributeValueMemberM); ok {
+			err = attributevalue.UnmarshalMap(data.Value, &existingPick)
+			if err != nil {
+				utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process pick data: "+err.Error())
+				return
+			}
+		} else {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid pick data format")
 			return
 		}
 
@@ -365,15 +416,34 @@ func UpdatePickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		existingPick.Week = req.Week
 		existingPick.UpdatedAt = time.Now()
 
-		// Convert to DynamoDB item
-		item, err := attributevalue.MarshalMap(existingPick)
+		// Marshal the updated pick data
+		data, err := attributevalue.MarshalMap(existingPick)
 		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to marshal pick: "+err.Error())
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process pick data")
 			return
 		}
 
-		// Update the pick in DynamoDB
-		if err := dbClient.PutItem(r.Context(), "Picks", item); err != nil {
+		// Update the item in DynamoDB
+		item := map[string]types.AttributeValue{
+			"PK":          key["PK"],
+			"SK":          key["SK"],
+			"GSI1_PK":     &types.AttributeValueMemberS{Value: "PICK"},
+			"GSI1_SK":     &types.AttributeValueMemberS{Value: "PICK#" + existingPick.ID},
+			"GSI2_PK":     &types.AttributeValueMemberS{Value: "WEEK#" + strconv.Itoa(req.Week)},
+			"GSI2_SK":     &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"entity_type": &types.AttributeValueMemberS{Value: "PICK"},
+			"id":          &types.AttributeValueMemberS{Value: existingPick.ID},
+			"user_id":     &types.AttributeValueMemberS{Value: userID},
+			"game_id":     &types.AttributeValueMemberS{Value: gameID},
+			"week":        &types.AttributeValueMemberN{Value: strconv.Itoa(req.Week)},
+			"status":      &types.AttributeValueMemberS{Value: existingPick.Status},
+			"points":      &types.AttributeValueMemberN{Value: strconv.Itoa(existingPick.Points)},
+			"created_at":  result["created_at"], // Preserve created_at
+			"updated_at":  &types.AttributeValueMemberS{Value: existingPick.UpdatedAt.Format(time.RFC3339)},
+			"data":        &types.AttributeValueMemberM{Value: data},
+		}
+
+		if err := dbClient.PutItem(r.Context(), "FootballLeague", item); err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to update pick: "+err.Error())
 			return
 		}
@@ -390,26 +460,29 @@ func DeletePickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Get pick ID from query parameters
-		pickID := r.URL.Query().Get("id")
-		if pickID == "" {
-			utils.RespondWithError(w, http.StatusBadRequest, "Pick ID is required")
+		// Get user ID and game ID from query parameters
+		userID := r.URL.Query().Get("user_id")
+		gameID := r.URL.Query().Get("game_id")
+		if userID == "" || gameID == "" {
+			utils.RespondWithError(w, http.StatusBadRequest, "User ID and Game ID are required")
 			return
 		}
 
-		// First check if the pick exists
+		// Create the key for the pick
 		key := map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: pickID},
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "PICK#" + gameID},
 		}
 
-		_, err := dbClient.GetItem(r.Context(), "Picks", key)
+		// First check if the pick exists
+		_, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusNotFound, "Pick not found")
 			return
 		}
 
 		// Delete the pick from DynamoDB
-		if err := dbClient.DeleteItem(r.Context(), "Picks", key); err != nil {
+		if err := dbClient.DeleteItem(r.Context(), "FootballLeague", key); err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete pick: "+err.Error())
 			return
 		}
@@ -420,36 +493,28 @@ func DeletePickHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	}
 }
 
-// Helper function to get picks by user and game
+// Helper function to get picks by user and game - now optimized for single table
 func getPicksByUserAndGame(dbClient db.DatabaseClient, ctx context.Context, userID, gameID string) ([]models.Pick, error) {
-	// Build the query
-	expr, err := expression.NewBuilder().
-		WithFilter(
-			expression.Name("user_id").Equal(expression.Value(userID)).
-				And(expression.Name("game_id").Equal(expression.Value(gameID))),
-		).
-		Build()
+	// Use efficient direct key lookup
+	key := map[string]types.AttributeValue{
+		"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+		"SK": &types.AttributeValueMemberS{Value: "PICK#" + gameID},
+	}
 
+	result, err := dbClient.GetItem(ctx, "FootballLeague", key)
 	if err != nil {
 		return nil, err
 	}
 
-	// Scan the Picks table with filter
-	result, err := dbClient.Scan(ctx, &dynamodb.ScanInput{
-		TableName:                 aws.String("Picks"),
-		FilterExpression:          expr.Filter(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshal the results
 	var picks []models.Pick
-	if err := attributevalue.UnmarshalListOfMaps(result.Items, &picks); err != nil {
-		return nil, err
+	if len(result) > 0 {
+		if data, ok := result["data"].(*types.AttributeValueMemberM); ok {
+			var pick models.Pick
+			err = attributevalue.UnmarshalMap(data.Value, &pick)
+			if err == nil {
+				picks = append(picks, pick)
+			}
+		}
 	}
 
 	return picks, nil

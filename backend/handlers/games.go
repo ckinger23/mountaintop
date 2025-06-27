@@ -156,24 +156,30 @@ func GetGameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Create the key for the query
-		key := map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
-		}
+		// Use GSI1 to find the game efficiently
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk AND GSI1_SK = :sk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "GAME"},
+				":sk": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
+			},
+			Limit: aws.Int32(1),
+		})
 
-		// Get the item from DynamoDB
-		item, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch game")
 			return
 		}
 
 		// Check if the item exists
-		if len(item) == 0 {
+		if len(result.Items) == 0 {
 			utils.RespondWithError(w, http.StatusNotFound, "Game not found")
 			return
 		}
+
+		item := result.Items[0]
 
 		// Unmarshal the game data
 		var game models.Game
@@ -345,10 +351,45 @@ func UpdateGameHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
-		// Get the existing game to update
+		// First, find the game using GSI to get its league ID
+		gsiResult, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk AND GSI1_SK = :sk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "GAME"},
+				":sk": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
+			},
+			Limit: aws.Int32(1),
+		})
+
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to find game")
+			return
+		}
+
+		if len(gsiResult.Items) == 0 {
+			utils.RespondWithError(w, http.StatusNotFound, "Game not found")
+			return
+		}
+
+		// Extract league ID from the result
+		var leagueID string
+		if leagueIDVal, ok := gsiResult.Items[0]["league_id"]; ok {
+			if leagueIDStr, ok := leagueIDVal.(*types.AttributeValueMemberS); ok {
+				leagueID = leagueIDStr.Value
+			}
+		}
+
+		if leagueID == "" {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid game data: missing league ID")
+			return
+		}
+
+		// Now get the game using its actual key
 		key := map[string]types.AttributeValue{
-			"PK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
-			"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+			"PK": &types.AttributeValueMemberS{Value: "LEAGUE#" + leagueID},
+			"SK": &types.AttributeValueMemberS{Value: "GAME#" + gameID},
 		}
 
 		// Get the existing game

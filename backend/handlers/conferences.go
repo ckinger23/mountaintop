@@ -311,8 +311,8 @@ func DeleteConferenceHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 		}
 
 		// First check if the conference exists
-		_, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
-		if err != nil {
+		result, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
+		if err != nil || len(result) == 0 {
 			utils.RespondWithError(w, http.StatusNotFound, "Conference not found")
 			return
 		}

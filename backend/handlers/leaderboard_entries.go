@@ -24,23 +24,31 @@ type LeaderboardResponse struct {
 // GetAllLeaderboardEntriesHandler returns all leaderboard entries
 func GetAllLeaderboardEntriesHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get all leaderboard entries
-		input := &dynamodb.ScanInput{
-			TableName: aws.String("LeaderboardEntries"), // Make sure this matches your DynamoDB table name
-		}
-
-		result, err := dbClient.Scan(r.Context(), input)
+		// Use GSI1 to efficiently get all leaderboard entries
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI1-EntityLookup"),
+			KeyConditionExpression: aws.String("GSI1_PK = :pk"),
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":pk": &types.AttributeValueMemberS{Value: "LEADERBOARD_ENTRY"},
+			},
+		})
 
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch leaderboard entries")
 			return
 		}
 
+		// Process the results
 		var entries []models.LeaderboardEntry
-		err = attributevalue.UnmarshalListOfMaps(result.Items, &entries)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process leaderboard entries")
-			return
+		for _, item := range result.Items {
+			if data, ok := item["data"].(*types.AttributeValueMemberM); ok {
+				var entry models.LeaderboardEntry
+				err = attributevalue.UnmarshalMap(data.Value, &entry)
+				if err == nil {
+					entries = append(entries, entry)
+				}
+			}
 		}
 
 		utils.RespondWithJSON(w, http.StatusOK, LeaderboardResponse{Entries: entries})
@@ -60,12 +68,13 @@ func GetLeaderboardEntryHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
+		// Use efficient key lookup with single table design
 		key := map[string]types.AttributeValue{
-			"user_id": &types.AttributeValueMemberS{Value: userID},
-			"week":    &types.AttributeValueMemberN{Value: strconv.Itoa(week)},
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "LEADERBOARD#WEEK#" + strconv.Itoa(week)},
 		}
 
-		result, err := dbClient.GetItem(r.Context(), "LeaderboardEntries", key)
+		result, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch leaderboard entry")
 			return
@@ -76,10 +85,16 @@ func GetLeaderboardEntryHandler(dbClient db.DatabaseClient) http.HandlerFunc {
 			return
 		}
 
+		// Unmarshal the leaderboard entry data
 		var entry models.LeaderboardEntry
-		err = attributevalue.UnmarshalMap(result, &entry)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process leaderboard entry")
+		if data, ok := result["data"].(*types.AttributeValueMemberM); ok {
+			err = attributevalue.UnmarshalMap(data.Value, &entry)
+			if err != nil {
+				utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process leaderboard entry")
+				return
+			}
+		} else {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid leaderboard entry data format")
 			return
 		}
 
@@ -99,30 +114,31 @@ func GetLeaderboardEntriesByWeekHandler(dbClient db.DatabaseClient) http.Handler
 			return
 		}
 
-		// Query the GSI for week
-		input := &dynamodb.ScanInput{
-			TableName:        aws.String("LeaderboardEntries"),
-			FilterExpression: aws.String("#week = :week"),
-			ExpressionAttributeNames: map[string]string{
-				"#week": "week",
-			},
+		// Use GSI2 to efficiently query leaderboard entries by week
+		result, err := dbClient.QueryItems(r.Context(), &dynamodb.QueryInput{
+			TableName:              aws.String("FootballLeague"),
+			IndexName:              aws.String("GSI2-UserPicks"),
+			KeyConditionExpression: aws.String("GSI2_PK = :pk"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
-				":week": &types.AttributeValueMemberN{Value: strconv.Itoa(week)},
+				":pk": &types.AttributeValueMemberS{Value: "LEADERBOARD_WEEK#" + strconv.Itoa(week)},
 			},
-		}
-
-		result, err := dbClient.Scan(r.Context(), input)
+		})
 
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch leaderboard entries")
 			return
 		}
 
+		// Process the results
 		var entries []models.LeaderboardEntry
-		err = attributevalue.UnmarshalListOfMaps(result.Items, &entries)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process leaderboard entries")
-			return
+		for _, item := range result.Items {
+			if data, ok := item["data"].(*types.AttributeValueMemberM); ok {
+				var entry models.LeaderboardEntry
+				err = attributevalue.UnmarshalMap(data.Value, &entry)
+				if err == nil {
+					entries = append(entries, entry)
+				}
+			}
 		}
 
 		utils.RespondWithJSON(w, http.StatusOK, LeaderboardResponse{Entries: entries})
@@ -155,6 +171,7 @@ func CreateLeaderboardEntryHandler(dbClient db.DatabaseClient) http.HandlerFunc 
 			return
 		}
 
+		now := time.Now()
 		entry := models.LeaderboardEntry{
 			UserID:    req.UserID,
 			Username:  req.Username,
@@ -162,15 +179,38 @@ func CreateLeaderboardEntryHandler(dbClient db.DatabaseClient) http.HandlerFunc 
 			Correct:   req.Correct,
 			Incorrect: req.Incorrect,
 			Week:      req.Week,
+			CreatedAt: now,
+			UpdatedAt: now,
 		}
 
-		item, err := attributevalue.MarshalMap(entry)
+		// Marshal the entry data
+		data, err := attributevalue.MarshalMap(entry)
 		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create leaderboard entry")
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process entry data")
 			return
 		}
 
-		err = dbClient.PutItem(r.Context(), "LeaderboardEntries", item)
+		// Create the item using single table design
+		item := map[string]types.AttributeValue{
+			"PK":          &types.AttributeValueMemberS{Value: "USER#" + req.UserID},
+			"SK":          &types.AttributeValueMemberS{Value: "LEADERBOARD#WEEK#" + strconv.Itoa(req.Week)},
+			"GSI1_PK":     &types.AttributeValueMemberS{Value: "LEADERBOARD_ENTRY"},
+			"GSI1_SK":     &types.AttributeValueMemberS{Value: "USER#" + req.UserID + "#WEEK#" + strconv.Itoa(req.Week)},
+			"GSI2_PK":     &types.AttributeValueMemberS{Value: "LEADERBOARD_WEEK#" + strconv.Itoa(req.Week)},
+			"GSI2_SK":     &types.AttributeValueMemberS{Value: "USER#" + req.UserID},
+			"entity_type": &types.AttributeValueMemberS{Value: "LEADERBOARD_ENTRY"},
+			"user_id":     &types.AttributeValueMemberS{Value: req.UserID},
+			"username":    &types.AttributeValueMemberS{Value: req.Username},
+			"week":        &types.AttributeValueMemberN{Value: strconv.Itoa(req.Week)},
+			"points":      &types.AttributeValueMemberN{Value: strconv.Itoa(req.Points)},
+			"correct":     &types.AttributeValueMemberN{Value: strconv.Itoa(req.Correct)},
+			"incorrect":   &types.AttributeValueMemberN{Value: strconv.Itoa(req.Incorrect)},
+			"created_at":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+			"updated_at":  &types.AttributeValueMemberS{Value: now.Format(time.RFC3339)},
+			"data":        &types.AttributeValueMemberM{Value: data},
+		}
+
+		err = dbClient.PutItem(r.Context(), "FootballLeague", item)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to save leaderboard entry")
 			return
@@ -207,90 +247,83 @@ func UpdateLeaderboardEntryHandler(dbClient db.DatabaseClient) http.HandlerFunc 
 		}
 		defer r.Body.Close()
 
-		// Build update expression
-		updateExpr := "SET "
-		exprAttrValues := make(map[string]types.AttributeValue)
-		exprAttrNames := make(map[string]string)
-		first := true
-
-		if req.Points != nil {
-			updateExpr += "#p = :p"
-			exprAttrValues[":p"] = &types.AttributeValueMemberN{Value: strconv.Itoa(*req.Points)}
-			exprAttrNames["#p"] = "points"
-			first = false
-		}
-
-		if req.Correct != nil {
-			if !first {
-				updateExpr += ", "
-			}
-			updateExpr += "#c = :c"
-			exprAttrValues[":c"] = &types.AttributeValueMemberN{Value: strconv.Itoa(*req.Correct)}
-			exprAttrNames["#c"] = "correct"
-			first = false
-		}
-
-		if req.Incorrect != nil {
-			if !first {
-				updateExpr += ", "
-			}
-			updateExpr += "#i = :i"
-			exprAttrValues[":i"] = &types.AttributeValueMemberN{Value: strconv.Itoa(*req.Incorrect)}
-			exprAttrNames["#i"] = "incorrect"
-		}
-
+		// Use efficient key lookup with single table design
 		key := map[string]types.AttributeValue{
-			"user_id": &types.AttributeValueMemberS{Value: userID},
-			"week":    &types.AttributeValueMemberN{Value: strconv.Itoa(week)},
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "LEADERBOARD#WEEK#" + strconv.Itoa(week)},
 		}
 
-		// Add updated_at
-		updateExpr += ", #u = :u"
-		exprAttrValues[":u"] = &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)}
-		exprAttrNames["#u"] = "updated_at"
-
-		// For simplicity, we'll use PutItem instead of UpdateItem since our DatabaseClient interface doesn't have UpdateItem
-		// First get the existing item
-		existingItem, err := dbClient.GetItem(r.Context(), "LeaderboardEntries", key)
+		// Get the existing item
+		existingItem, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch existing leaderboard entry")
 			return
 		}
 
-		// Update the fields
+		if len(existingItem) == 0 {
+			utils.RespondWithError(w, http.StatusNotFound, "Leaderboard entry not found")
+			return
+		}
+
+		// Unmarshal existing data to get current values
+		var existingEntry models.LeaderboardEntry
+		if data, ok := existingItem["data"].(*types.AttributeValueMemberM); ok {
+			err = attributevalue.UnmarshalMap(data.Value, &existingEntry)
+			if err != nil {
+				utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process existing entry")
+				return
+			}
+		} else {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Invalid entry data format")
+			return
+		}
+
+		// Update the fields if provided
 		if req.Points != nil {
-			existingItem["points"] = &types.AttributeValueMemberN{Value: strconv.Itoa(*req.Points)}
+			existingEntry.Points = *req.Points
 		}
 		if req.Correct != nil {
-			existingItem["correct"] = &types.AttributeValueMemberN{Value: strconv.Itoa(*req.Correct)}
+			existingEntry.Correct = *req.Correct
 		}
 		if req.Incorrect != nil {
-			existingItem["incorrect"] = &types.AttributeValueMemberN{Value: strconv.Itoa(*req.Incorrect)}
+			existingEntry.Incorrect = *req.Incorrect
 		}
-		existingItem["updated_at"] = &types.AttributeValueMemberS{Value: time.Now().Format(time.RFC3339)}
+		existingEntry.UpdatedAt = time.Now()
 
-		// Save the updated item
-		err = dbClient.PutItem(r.Context(), "LeaderboardEntries", existingItem)
+		// Marshal the updated entry data
+		data, err := attributevalue.MarshalMap(existingEntry)
+		if err != nil {
+			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process updated entry data")
+			return
+		}
+
+		// Update the item
+		updatedItem := map[string]types.AttributeValue{
+			"PK":          key["PK"],
+			"SK":          key["SK"],
+			"GSI1_PK":     &types.AttributeValueMemberS{Value: "LEADERBOARD_ENTRY"},
+			"GSI1_SK":     &types.AttributeValueMemberS{Value: "USER#" + userID + "#WEEK#" + strconv.Itoa(week)},
+			"GSI2_PK":     &types.AttributeValueMemberS{Value: "LEADERBOARD_WEEK#" + strconv.Itoa(week)},
+			"GSI2_SK":     &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"entity_type": &types.AttributeValueMemberS{Value: "LEADERBOARD_ENTRY"},
+			"user_id":     &types.AttributeValueMemberS{Value: userID},
+			"username":    existingItem["username"], // Preserve username
+			"week":        &types.AttributeValueMemberN{Value: strconv.Itoa(week)},
+			"points":      &types.AttributeValueMemberN{Value: strconv.Itoa(existingEntry.Points)},
+			"correct":     &types.AttributeValueMemberN{Value: strconv.Itoa(existingEntry.Correct)},
+			"incorrect":   &types.AttributeValueMemberN{Value: strconv.Itoa(existingEntry.Incorrect)},
+			"created_at":  existingItem["created_at"], // Preserve created_at
+			"updated_at":  &types.AttributeValueMemberS{Value: existingEntry.UpdatedAt.Format(time.RFC3339)},
+			"data":        &types.AttributeValueMemberM{Value: data},
+		}
+
+		err = dbClient.PutItem(r.Context(), "FootballLeague", updatedItem)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to update leaderboard entry")
 			return
 		}
 
-		// Return the updated entry
-		result, err := dbClient.GetItem(r.Context(), "LeaderboardEntries", key)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch updated leaderboard entry")
-			return
-		}
-
-		var entry models.LeaderboardEntry
-		err = attributevalue.UnmarshalMap(result, &entry)
-		if err != nil {
-			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to process leaderboard entry")
-			return
-		}
-
-		utils.RespondWithJSON(w, http.StatusOK, entry)
+		utils.RespondWithJSON(w, http.StatusOK, existingEntry)
 	}
 }
 
@@ -307,19 +340,20 @@ func DeleteLeaderboardEntryHandler(dbClient db.DatabaseClient) http.HandlerFunc 
 			return
 		}
 
+		// Use efficient key with single table design
 		key := map[string]types.AttributeValue{
-			"user_id": &types.AttributeValueMemberS{Value: userID},
-			"week":    &types.AttributeValueMemberN{Value: strconv.Itoa(week)},
+			"PK": &types.AttributeValueMemberS{Value: "USER#" + userID},
+			"SK": &types.AttributeValueMemberS{Value: "LEADERBOARD#WEEK#" + strconv.Itoa(week)},
 		}
 
 		// First check if the entry exists
-		result, err := dbClient.GetItem(r.Context(), "LeaderboardEntries", key)
+		result, err := dbClient.GetItem(r.Context(), "FootballLeague", key)
 		if err != nil || len(result) == 0 {
 			utils.RespondWithError(w, http.StatusNotFound, "Leaderboard entry not found")
 			return
 		}
 
-		err = dbClient.DeleteItem(r.Context(), "LeaderboardEntries", key)
+		err = dbClient.DeleteItem(r.Context(), "FootballLeague", key)
 		if err != nil {
 			utils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete leaderboard entry")
 			return

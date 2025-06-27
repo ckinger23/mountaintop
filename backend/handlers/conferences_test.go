@@ -207,12 +207,16 @@ func TestGetAllConferencesHandler(t *testing.T) {
 			setupMock: func(mockDB *MockDBClient) {
 				mockDB.On("QueryItems", mock.MatchedBy(func(input *dynamodb.QueryInput) bool {
 					return *input.TableName == "FootballLeague" &&
-						*input.IndexName == "GSI1-EntityLookup"
+						*input.IndexName == "GSI1-EntityLookup" &&
+						input.ExpressionAttributeValues[":pk"].(*types.AttributeValueMemberS).Value == "CONFERENCE"
 				})).Return(&dynamodb.QueryOutput{
 					Items: []map[string]types.AttributeValue{
 						{
 							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#SEC"},
 							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"GSI1_SK": &types.AttributeValueMemberS{Value: "CONFERENCE#SEC"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
 							"data": &types.AttributeValueMemberM{
 								Value: map[string]types.AttributeValue{
 									"id":         &types.AttributeValueMemberS{Value: "SEC"},
@@ -225,6 +229,9 @@ func TestGetAllConferencesHandler(t *testing.T) {
 						{
 							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#B1G"},
 							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"GSI1_SK": &types.AttributeValueMemberS{Value: "CONFERENCE#B1G"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
 							"data": &types.AttributeValueMemberM{
 								Value: map[string]types.AttributeValue{
 									"id":         &types.AttributeValueMemberS{Value: "B1G"},
@@ -244,7 +251,10 @@ func TestGetAllConferencesHandler(t *testing.T) {
 		{
 			name: "empty results",
 			setupMock: func(mockDB *MockDBClient) {
-				mockDB.On("QueryItems", mock.Anything).Return(&dynamodb.QueryOutput{
+				mockDB.On("QueryItems", mock.MatchedBy(func(input *dynamodb.QueryInput) bool {
+					return *input.TableName == "FootballLeague" &&
+						*input.IndexName == "GSI1-EntityLookup"
+				})).Return(&dynamodb.QueryOutput{
 					Items: []map[string]types.AttributeValue{},
 				}, nil)
 			},
@@ -255,7 +265,9 @@ func TestGetAllConferencesHandler(t *testing.T) {
 		{
 			name: "database error",
 			setupMock: func(mockDB *MockDBClient) {
-				mockDB.On("QueryItems", mock.Anything).Return(nil, errors.New("database connection failed"))
+				mockDB.On("QueryItems", mock.MatchedBy(func(input *dynamodb.QueryInput) bool {
+					return *input.TableName == "FootballLeague"
+				})).Return(nil, errors.New("database connection failed"))
 			},
 			expectedStatus: http.StatusInternalServerError,
 			expectedCount:  0,
@@ -264,11 +276,15 @@ func TestGetAllConferencesHandler(t *testing.T) {
 		{
 			name: "partial data corruption",
 			setupMock: func(mockDB *MockDBClient) {
-				mockDB.On("QueryItems", mock.Anything).Return(&dynamodb.QueryOutput{
+				mockDB.On("QueryItems", mock.MatchedBy(func(input *dynamodb.QueryInput) bool {
+					return *input.TableName == "FootballLeague"
+				})).Return(&dynamodb.QueryOutput{
 					Items: []map[string]types.AttributeValue{
 						{
 							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#SEC"},
 							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
 							"data": &types.AttributeValueMemberM{
 								Value: map[string]types.AttributeValue{
 									"id":         &types.AttributeValueMemberS{Value: "SEC"},
@@ -281,6 +297,8 @@ func TestGetAllConferencesHandler(t *testing.T) {
 						{
 							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#CORRUPT"},
 							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
 							"data": &types.AttributeValueMemberS{Value: "invalid-format"},
 						},
 					},
@@ -288,6 +306,74 @@ func TestGetAllConferencesHandler(t *testing.T) {
 			},
 			expectedStatus: http.StatusOK,
 			expectedCount:  1, // Only valid record should be returned
+			expectError:    false,
+		},
+		{
+			name: "GSI returns null data field",
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("QueryItems", mock.MatchedBy(func(input *dynamodb.QueryInput) bool {
+					return *input.TableName == "FootballLeague"
+				})).Return(&dynamodb.QueryOutput{
+					Items: []map[string]types.AttributeValue{
+						{
+							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#SEC"},
+							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							// No data field - should be skipped
+						},
+					},
+				}, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedCount:  0, // No valid records should be returned
+			expectError:    false,
+		},
+		{
+			name: "mixed valid and invalid records",
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("QueryItems", mock.MatchedBy(func(input *dynamodb.QueryInput) bool {
+					return *input.TableName == "FootballLeague"
+				})).Return(&dynamodb.QueryOutput{
+					Items: []map[string]types.AttributeValue{
+						{
+							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#SEC"},
+							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"data": &types.AttributeValueMemberM{
+								Value: map[string]types.AttributeValue{
+									"id":         &types.AttributeValueMemberS{Value: "SEC"},
+									"name":       &types.AttributeValueMemberS{Value: "SEC"},
+									"created_at": &types.AttributeValueMemberS{Value: "2023-01-01T00:00:00Z"},
+									"updated_at": &types.AttributeValueMemberS{Value: "2023-01-01T00:00:00Z"},
+								},
+							},
+						},
+						{
+							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#INVALID"},
+							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							// Missing data field
+						},
+						{
+							"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#B12"},
+							"SK": &types.AttributeValueMemberS{Value: "METADATA"},
+							"GSI1_PK": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"entity_type": &types.AttributeValueMemberS{Value: "CONFERENCE"},
+							"data": &types.AttributeValueMemberM{
+								Value: map[string]types.AttributeValue{
+									"id":         &types.AttributeValueMemberS{Value: "B12"},
+									"name":       &types.AttributeValueMemberS{Value: "Big 12"},
+									"created_at": &types.AttributeValueMemberS{Value: "2023-01-01T00:00:00Z"},
+									"updated_at": &types.AttributeValueMemberS{Value: "2023-01-01T00:00:00Z"},
+								},
+							},
+						},
+					},
+				}, nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectedCount:  2, // Only the 2 valid records should be returned
 			expectError:    false,
 		},
 	}
@@ -348,7 +434,10 @@ func TestCreateConferenceHandler(t *testing.T) {
 					pk := item["PK"].(*types.AttributeValueMemberS).Value
 					sk := item["SK"].(*types.AttributeValueMemberS).Value
 					entityType := item["entity_type"].(*types.AttributeValueMemberS).Value
-					return strings.HasPrefix(pk, "CONFERENCE#") && sk == "METADATA" && entityType == "CONFERENCE"
+					gsi1PK := item["GSI1_PK"].(*types.AttributeValueMemberS).Value
+					gsi1SK := item["GSI1_SK"].(*types.AttributeValueMemberS).Value
+					return strings.HasPrefix(pk, "CONFERENCE#") && sk == "METADATA" && 
+						entityType == "CONFERENCE" && gsi1PK == "CONFERENCE" && strings.HasPrefix(gsi1SK, "CONFERENCE#")
 				})).Return(nil)
 			},
 			expectedStatus: http.StatusCreated,
@@ -407,6 +496,42 @@ func TestCreateConferenceHandler(t *testing.T) {
 			method: "POST",
 			request: CreateConferenceRequest{
 				Name: "Test & Special @ Conference",
+			},
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("PutItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectError:    false,
+		},
+		{
+			name:   "very long conference name",
+			method: "POST",
+			request: CreateConferenceRequest{
+				Name: "This is a very long conference name that should still be accepted because there might be legitimate cases where conference names are quite descriptive and lengthy",
+			},
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("PutItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectError:    false,
+		},
+		{
+			name:   "name with unicode characters",
+			method: "POST",
+			request: CreateConferenceRequest{
+				Name: "Conferência Atlética 中国足球联盟",
+			},
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("PutItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
+			},
+			expectedStatus: http.StatusCreated,
+			expectError:    false,
+		},
+		{
+			name:   "name with newlines and tabs",
+			method: "POST",
+			request: CreateConferenceRequest{
+				Name: "Conference\nWith\tSpecial\rCharacters",
 			},
 			setupMock: func(mockDB *MockDBClient) {
 				mockDB.On("PutItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
@@ -577,6 +702,42 @@ func TestUpdateConferenceHandler(t *testing.T) {
 			expectedStatus: http.StatusInternalServerError,
 			expectError:    true,
 		},
+		{
+			name:         "update with same name",
+			conferenceID: "SEC",
+			request:      CreateConferenceRequest{Name: "SEC"},
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("GetItem", mock.Anything, "FootballLeague", mock.Anything).Return(map[string]types.AttributeValue{
+					"data": &types.AttributeValueMemberM{
+						Value: map[string]types.AttributeValue{
+							"name": &types.AttributeValueMemberS{Value: "SEC"},
+						},
+					},
+					"created_at": &types.AttributeValueMemberS{Value: fixedTime.Format(time.RFC3339)},
+				}, nil)
+				mockDB.On("PutItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectError:    false,
+		},
+		{
+			name:         "update with unicode name",
+			conferenceID: "SEC",
+			request:      CreateConferenceRequest{Name: "东南会议"},
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("GetItem", mock.Anything, "FootballLeague", mock.Anything).Return(map[string]types.AttributeValue{
+					"data": &types.AttributeValueMemberM{
+						Value: map[string]types.AttributeValue{
+							"name": &types.AttributeValueMemberS{Value: "SEC"},
+						},
+					},
+					"created_at": &types.AttributeValueMemberS{Value: fixedTime.Format(time.RFC3339)},
+				}, nil)
+				mockDB.On("PutItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectError:    false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -686,6 +847,33 @@ func TestDeleteConferenceHandler(t *testing.T) {
 				mockDB.On("DeleteItem", mock.Anything, "FootballLeague", mock.Anything).Return(errors.New("database error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
+			expectError:    true,
+		},
+		{
+			name:         "delete with special characters in ID",
+			method:       "DELETE",
+			conferenceID: "CONFERENCE_WITH_UNDERSCORES",
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("GetItem", mock.Anything, "FootballLeague", mock.MatchedBy(func(key map[string]types.AttributeValue) bool {
+					pk := key["PK"].(*types.AttributeValueMemberS).Value
+					sk := key["SK"].(*types.AttributeValueMemberS).Value
+					return pk == "CONFERENCE#CONFERENCE_WITH_UNDERSCORES" && sk == "METADATA"
+				})).Return(map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: "CONFERENCE#CONFERENCE_WITH_UNDERSCORES"},
+				}, nil)
+				mockDB.On("DeleteItem", mock.Anything, "FootballLeague", mock.Anything).Return(nil)
+			},
+			expectedStatus: http.StatusOK,
+			expectError:    false,
+		},
+		{
+			name:         "delete with empty result on existence check",
+			method:       "DELETE",
+			conferenceID: "NONEXISTENT",
+			setupMock: func(mockDB *MockDBClient) {
+				mockDB.On("GetItem", mock.Anything, "FootballLeague", mock.Anything).Return(map[string]types.AttributeValue{}, nil)
+			},
+			expectedStatus: http.StatusNotFound,
 			expectError:    true,
 		},
 	}

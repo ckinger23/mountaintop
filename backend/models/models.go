@@ -72,10 +72,12 @@ type Pick struct {
 
 // LeaderboardEntry represents a user's leaderboard position
 type LeaderboardEntry struct {
-	UserID    string `dynamodbav:"user_id"`
-	Username  string `dynamodbav:"username"`
-	Points    int    `dynamodbav:"points"`
-	Correct   int    `dynamodbav:"correct"`
-	Incorrect int    `dynamodbav:"incorrect"`
-	Week      int    `dynamodbav:"week"`
+	UserID    string    `dynamodbav:"user_id"`
+	Username  string    `dynamodbav:"username"`
+	Points    int       `dynamodbav:"points"`
+	Correct   int       `dynamodbav:"correct"`
+	Incorrect int       `dynamodbav:"incorrect"`
+	Week      int       `dynamodbav:"week"`
+	CreatedAt time.Time `dynamodbav:"created_at"`
+	UpdatedAt time.Time `dynamodbav:"updated_at"`
 }
