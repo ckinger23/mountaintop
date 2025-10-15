@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ckinger23/cfb-picks-system/internal/database"
-	"github.com/ckinger23/cfb-picks-system/internal/middleware"
-	"github.com/ckinger23/cfb-picks-system/internal/models"
+	"github.com/ckinger23/mountaintop/internal/database"
+	"github.com/ckinger23/mountaintop/internal/middleware"
+	"github.com/ckinger23/mountaintop/internal/models"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -59,12 +59,12 @@ func SubmitPick(w http.ResponseWriter, r *http.Request) {
 	// Check if pick already exists
 	var existingPick models.Pick
 	err := database.DB.Where("user_id = ? AND game_id = ?", claims.UserID, req.GameID).First(&existingPick).Error
-	
+
 	if err == nil {
 		// Update existing pick
 		existingPick.PickedTeamID = req.PickedTeamID
 		existingPick.Confidence = req.Confidence
-		
+
 		if err := database.DB.Save(&existingPick).Error; err != nil {
 			http.Error(w, "Error updating pick", http.StatusInternalServerError)
 			return
@@ -206,15 +206,15 @@ func GetPickStats(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
 
 	type Stats struct {
-		TotalPicks    int     `json:"total_picks"`
-		CorrectPicks  int     `json:"correct_picks"`
-		IncorrectPicks int    `json:"incorrect_picks"`
-		WinPercentage float64 `json:"win_percentage"`
-		TotalPoints   int     `json:"total_points"`
+		TotalPicks     int64   `json:"total_picks"`
+		CorrectPicks   int64   `json:"correct_picks"`
+		IncorrectPicks int64   `json:"incorrect_picks"`
+		WinPercentage  float64 `json:"win_percentage"`
+		TotalPoints    int     `json:"total_points"`
 	}
 
 	var stats Stats
-	
+
 	database.DB.Model(&models.Pick{}).
 		Where("user_id = ? AND is_correct IS NOT NULL", userID).
 		Count(&stats.TotalPicks)
@@ -224,7 +224,7 @@ func GetPickStats(w http.ResponseWriter, r *http.Request) {
 		Count(&stats.CorrectPicks)
 
 	stats.IncorrectPicks = stats.TotalPicks - stats.CorrectPicks
-	
+
 	if stats.TotalPicks > 0 {
 		stats.WinPercentage = float64(stats.CorrectPicks) / float64(stats.TotalPicks) * 100
 	}

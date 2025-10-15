@@ -1,0 +1,70 @@
+# Backend (Go)
+backend/go.sum
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/bin/
+/pkg/
+vendor/
+
+# Frontend (Node.js)
+frontend/node_modules/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/lerna-debug.log*
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/.turbo/
+frontend/build/
+frontend/.next/
+frontend/out/
+frontend/.nuxt/
+frontend/.cache/
+frontend/.parcel-cache/
+frontend/.svelte-kit/
+frontend/package-lock.json
+frontend/bun.lock
+frontend/yarn.lock
+frontend/pnpm-lock.yaml
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+*.cover
+*.coverage
+
+# Temporary files
+*.tmp
+tmp/
+temp/

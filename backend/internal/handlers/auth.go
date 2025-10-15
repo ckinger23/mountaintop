@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/ckinger23/cfb-picks-system/internal/database"
-	"github.com/ckinger23/cfb-picks-system/internal/middleware"
-	"github.com/ckinger23/cfb-picks-system/internal/models"
+	"github.com/ckinger23/mountaintop/internal/database"
+	"github.com/ckinger23/mountaintop/internal/middleware"
+	"github.com/ckinger23/mountaintop/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
 

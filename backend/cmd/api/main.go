@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/ckinger23/cfb-picks-system/internal/database"
-	"github.com/ckinger23/cfb-picks-system/internal/handlers"
-	"github.com/ckinger23/cfb-picks-system/internal/middleware"
+	"github.com/ckinger23/mountaintop/internal/database"
+	"github.com/ckinger23/mountaintop/internal/handlers"
+	"github.com/ckinger23/mountaintop/internal/middleware"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -53,7 +53,7 @@ func main() {
 	// Public routes
 	r.Post("/api/auth/register", handlers.Register)
 	r.Post("/api/auth/login", handlers.Login)
-	
+
 	// Public read-only routes (no auth required)
 	r.Get("/api/teams", handlers.GetTeams)
 	r.Get("/api/seasons", handlers.GetSeasons)

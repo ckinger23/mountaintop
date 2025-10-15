@@ -5,22 +5,22 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/ckinger23/cfb-picks-system/internal/database"
-	"github.com/ckinger23/cfb-picks-system/internal/models"
+	"github.com/ckinger23/mountaintop/internal/database"
+	"github.com/ckinger23/mountaintop/internal/models"
 	"github.com/go-chi/chi/v5"
 )
 
 // GetGames returns all games for a specific week
 func GetGames(w http.ResponseWriter, r *http.Request) {
 	weekID := r.URL.Query().Get("week_id")
-	
+
 	var games []models.Game
 	query := database.DB.Preload("HomeTeam").Preload("AwayTeam").Preload("Week")
-	
+
 	if weekID != "" {
 		query = query.Where("week_id = ?", weekID)
 	}
-	
+
 	if err := query.Find(&games).Error; err != nil {
 		http.Error(w, "Error fetching games", http.StatusInternalServerError)
 		return
@@ -33,7 +33,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 // GetGame returns a single game by ID
 func GetGame(w http.ResponseWriter, r *http.Request) {
 	gameID := chi.URLParam(r, "id")
-	
+
 	var game models.Game
 	if err := database.DB.Preload("HomeTeam").Preload("AwayTeam").Preload("Week").First(&game, gameID).Error; err != nil {
 		http.Error(w, "Game not found", http.StatusNotFound)
@@ -97,7 +97,7 @@ type UpdateGameResultRequest struct {
 // UpdateGameResult updates the score and determines winner (admin only)
 func UpdateGameResult(w http.ResponseWriter, r *http.Request) {
 	gameID := chi.URLParam(r, "id")
-	
+
 	var req UpdateGameResultRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -155,7 +155,7 @@ func calculatePickResults(gameID uint) error {
 	for _, pick := range picks {
 		isCorrect := pick.PickedTeamID == *game.WinnerTeamID
 		pick.IsCorrect = &isCorrect
-		
+
 		// Simple scoring: 1 point for correct pick
 		if isCorrect {
 			pick.PointsEarned = 1
@@ -172,14 +172,14 @@ func calculatePickResults(gameID uint) error {
 // GetWeeks returns all weeks, optionally filtered by season
 func GetWeeks(w http.ResponseWriter, r *http.Request) {
 	seasonID := r.URL.Query().Get("season_id")
-	
+
 	var weeks []models.Week
 	query := database.DB.Preload("Season")
-	
+
 	if seasonID != "" {
 		query = query.Where("season_id = ?", seasonID)
 	}
-	
+
 	if err := query.Order("week_number ASC").Find(&weeks).Error; err != nil {
 		http.Error(w, "Error fetching weeks", http.StatusInternalServerError)
 		return
@@ -235,9 +235,9 @@ func GetSeasons(w http.ResponseWriter, r *http.Request) {
 // GetLeaderboard returns the current standings
 func GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	seasonIDStr := r.URL.Query().Get("season_id")
-	
+
 	var leaderboard []models.LeaderboardEntry
-	
+
 	query := `
 		SELECT 
 			u.id as user_id,
@@ -252,13 +252,13 @@ func GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN games g ON p.game_id = g.id
 		LEFT JOIN weeks w ON g.week_id = w.id
 	`
-	
+
 	if seasonIDStr != "" {
 		seasonID, _ := strconv.Atoi(seasonIDStr)
 		query += ` WHERE w.season_id = ?`
 		database.DB.Raw(query+` GROUP BY u.id ORDER BY total_points DESC`, seasonID).Scan(&leaderboard)
 	} else {
-		database.DB.Raw(query+` GROUP BY u.id ORDER BY total_points DESC`).Scan(&leaderboard)
+		database.DB.Raw(query + ` GROUP BY u.id ORDER BY total_points DESC`).Scan(&leaderboard)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
