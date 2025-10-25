@@ -1,8 +1,10 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/ckinger23/mountaintop/internal/models"
 	"gorm.io/driver/sqlite"
@@ -10,32 +12,28 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var DB *gorm.DB
-
-// Connect initializes the database connection
-func Connect(dbPath string) error {
-	var err error
-
+// Connect initializes the database connection and returns the DB instance
+func Connect(dbPath string) (*gorm.DB, error) {
 	// Configure GORM
 	config := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	}
 
 	// Connect to SQLite (can easily swap to PostgreSQL later)
-	DB, err = gorm.Open(sqlite.Open(dbPath), config)
+	db, err := gorm.Open(sqlite.Open(dbPath), config)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	log.Println("Database connection established")
-	return nil
+	return db, nil
 }
 
 // Migrate runs all database migrations
-func Migrate() error {
+func Migrate(db *gorm.DB) error {
 	log.Println("Running database migrations...")
 
-	err := DB.AutoMigrate(
+	err := db.AutoMigrate(
 		&models.User{},
 		&models.Season{},
 		&models.Week{},
@@ -53,35 +51,33 @@ func Migrate() error {
 }
 
 // SeedData adds initial data for testing/development
-func SeedData() error {
+func SeedData(db *gorm.DB) error {
 	log.Println("Seeding database with initial data...")
 
 	// Check if data already exists
 	var count int64
-	DB.Model(&models.Team{}).Count(&count)
+	db.Model(&models.Team{}).Count(&count)
 	if count > 0 {
 		log.Println("Database already seeded, skipping...")
 		return nil
 	}
 
-	// Add some sample teams
-	teams := []models.Team{
-		{Name: "Alabama", Abbreviation: "ALA", Conference: "SEC"},
-		{Name: "Georgia", Abbreviation: "UGA", Conference: "SEC"},
-		{Name: "Ohio State", Abbreviation: "OSU", Conference: "Big Ten"},
-		{Name: "Michigan", Abbreviation: "MICH", Conference: "Big Ten"},
-		{Name: "Texas", Abbreviation: "TEX", Conference: "SEC"},
-		{Name: "USC", Abbreviation: "USC", Conference: "Big Ten"},
-		{Name: "Oregon", Abbreviation: "ORE", Conference: "Big Ten"},
-		{Name: "Penn State", Abbreviation: "PSU", Conference: "Big Ten"},
+	// Load teams from JSON file
+	data, err := os.ReadFile("data/teams.json")
+	if err != nil {
+		return fmt.Errorf("failed to read teams.json: %w", err)
 	}
 
-	for _, team := range teams {
-		if err := DB.Create(&team).Error; err != nil {
-			return fmt.Errorf("failed to seed team %s: %w", team.Name, err)
-		}
+	var teams []models.Team
+	if err := json.Unmarshal(data, &teams); err != nil {
+		return fmt.Errorf("failed to parse teams.json: %w", err)
 	}
 
-	log.Println("Database seeded successfully")
+	// Bulk insert all teams
+	if err := db.Create(&teams).Error; err != nil {
+		return fmt.Errorf("failed to seed teams: %w", err)
+	}
+
+	log.Printf("Database seeded successfully with %d teams", len(teams))
 	return nil
 }

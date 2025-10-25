@@ -39,6 +39,7 @@ func GenerateToken(userID uint, email string, isAdmin bool) (string, error) {
 }
 
 // AuthMiddleware validates JWT tokens
+// Chi's r.Use() automatically provides the next http.Handler
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -67,7 +68,15 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Add claims to request context
+		// Context in Go helps with passsing request-scoped values,
+		// cancellation signals and deadlines across API/function boundaries
+		// backpack that travels with http request through each handler chain
+		// grab the context that is a part of the request r
+		// WithValue creates a new context with the added value, contexts are immutable
 		ctx := context.WithValue(r.Context(), UserContextKey, claims)
+		// pass the new context to the next handler
+		// r.WithContext creates shallow copy of the request with the New context
+		// next.ServeHttp call the next handler in the chain
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

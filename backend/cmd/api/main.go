@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ckinger23/mountaintop/internal/app"
 	"github.com/ckinger23/mountaintop/internal/database"
 	"github.com/ckinger23/mountaintop/internal/handlers"
 	"github.com/ckinger23/mountaintop/internal/middleware"
@@ -21,25 +22,35 @@ func main() {
 		dbPath = "./cfb-picks.db"
 	}
 
-	if err := database.Connect(dbPath); err != nil {
+	db, err := database.Connect(dbPath)
+	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
 	// Run migrations
-	if err := database.Migrate(); err != nil {
+	if err := database.Migrate(db); err != nil {
 		log.Fatal("Failed to run migrations:", err)
 	}
 
 	// Seed data (only runs if database is empty)
-	if err := database.SeedData(); err != nil {
+	if err := database.SeedData(db); err != nil {
 		log.Fatal("Failed to seed data:", err)
 	}
 
+	// Initialize application with dependencies
+	application := app.NewApp(db)
+
 	// Initialize router
+	// returns a *chi.Mux which implements http.Handler
+	// define routes, URL params, add middleware (logging auth, recover)
+	// create Groups that all use same middleware
+	// mounta as HTTP Server with ListenAndServe
 	r := chi.NewRouter()
 
 	// Middleware
 	r.Use(chimiddleware.Logger)
+	// catch panics and prevent server from crashing
+	// panic caught, HTTP 500 fro request, server keeps running
 	r.Use(chimiddleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:5173"}, // React dev server
@@ -51,33 +62,34 @@ func main() {
 	}))
 
 	// Public routes
-	r.Post("/api/auth/register", handlers.Register)
-	r.Post("/api/auth/login", handlers.Login)
+	r.Post("/api/auth/register", handlers.Register(application))
+	r.Post("/api/auth/login", handlers.Login(application))
 
 	// Public read-only routes (no auth required)
-	r.Get("/api/teams", handlers.GetTeams)
-	r.Get("/api/seasons", handlers.GetSeasons)
-	r.Get("/api/leaderboard", handlers.GetLeaderboard)
+	r.Get("/api/teams", handlers.GetTeams(application))
+	r.Get("/api/seasons", handlers.GetSeasons(application))
+	r.Get("/api/leaderboard", handlers.GetLeaderboard(application))
 
 	// Protected routes (authentication required)
 	r.Group(func(r chi.Router) {
+		// r.Use provides the http.Handler argument to middleware automatically
 		r.Use(middleware.AuthMiddleware)
 
 		// User routes
-		r.Get("/api/auth/me", handlers.GetCurrentUser)
+		r.Get("/api/auth/me", handlers.GetCurrentUser(application))
 
 		// Games
-		r.Get("/api/games", handlers.GetGames)
-		r.Get("/api/games/{id}", handlers.GetGame)
-		r.Get("/api/weeks", handlers.GetWeeks)
-		r.Get("/api/weeks/current", handlers.GetCurrentWeek)
+		r.Get("/api/games", handlers.GetGames(application))
+		r.Get("/api/games/{id}", handlers.GetGame(application))
+		r.Get("/api/weeks", handlers.GetWeeks(application))
+		r.Get("/api/weeks/current", handlers.GetCurrentWeek(application))
 
 		// Picks
-		r.Post("/api/picks", handlers.SubmitPick)
-		r.Get("/api/picks/me", handlers.GetUserPicks)
-		r.Get("/api/picks/user/{userId}", handlers.GetPicksByUser)
-		r.Get("/api/picks/week/{weekId}", handlers.GetAllPicksForWeek)
-		r.Get("/api/picks/stats/{userId}", handlers.GetPickStats)
+		r.Post("/api/picks", handlers.SubmitPick(application))
+		r.Get("/api/picks/me", handlers.GetMyPicks(application))
+		r.Get("/api/picks/user/{userId}", handlers.GetPicksForUser(application))
+		r.Get("/api/picks/week/{weekId}", handlers.GetAllPicksForWeek(application))
+		r.Get("/api/picks/stats/{userId}", handlers.GetPickStats(application))
 	})
 
 	// Admin routes (authentication + admin required)
@@ -86,10 +98,14 @@ func main() {
 		r.Use(middleware.AdminMiddleware)
 
 		// Game management
-		r.Post("/api/admin/games", handlers.CreateGame)
-		r.Put("/api/admin/games/{id}/result", handlers.UpdateGameResult)
+		r.Post("/api/admin/games", handlers.CreateGame(application))
+		r.Put("/api/admin/games/{id}/result", handlers.UpdateGameResult(application))
 
-		// TODO: Add more admin routes for creating weeks, seasons, teams, etc.
+		// Season management
+		r.Post("/api/admin/seasons", handlers.CreateSeason(application))
+
+		// Week management
+		r.Post("/api/admin/weeks", handlers.CreateWeek(application))
 	})
 
 	// Start server

@@ -1,0 +1,794 @@
+[
+  {
+    "name": "Air Force",
+    "abbreviation": "AFA",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "Akron",
+    "abbreviation": "AKR",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Alabama",
+    "abbreviation": "ALA",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Appalachian State",
+    "abbreviation": "APP",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Arizona",
+    "abbreviation": "ARIZ",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Arizona State",
+    "abbreviation": "ASU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Arkansas",
+    "abbreviation": "ARK",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Arkansas State",
+    "abbreviation": "ARST",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Army",
+    "abbreviation": "ARMY",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Auburn",
+    "abbreviation": "AUB",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Ball State",
+    "abbreviation": "BALL",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Baylor",
+    "abbreviation": "BAY",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Boise State",
+    "abbreviation": "BSU",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "Boston College",
+    "abbreviation": "BC",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Bowling Green",
+    "abbreviation": "BGSU",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Buffalo",
+    "abbreviation": "BUF",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "BYU",
+    "abbreviation": "BYU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "California",
+    "abbreviation": "CAL",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Central Michigan",
+    "abbreviation": "CMU",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Charlotte",
+    "abbreviation": "CHAR",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Cincinnati",
+    "abbreviation": "CIN",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Clemson",
+    "abbreviation": "CLEM",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Coastal Carolina",
+    "abbreviation": "CCU",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Colorado",
+    "abbreviation": "COLO",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Colorado State",
+    "abbreviation": "CSU",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "Duke",
+    "abbreviation": "DUKE",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "East Carolina",
+    "abbreviation": "ECU",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Eastern Michigan",
+    "abbreviation": "EMU",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Florida",
+    "abbreviation": "FLA",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Florida Atlantic",
+    "abbreviation": "FAU",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Florida International",
+    "abbreviation": "FIU",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "Florida State",
+    "abbreviation": "FSU",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Fresno State",
+    "abbreviation": "FRES",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "Georgia",
+    "abbreviation": "UGA",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Georgia Southern",
+    "abbreviation": "GASO",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Georgia State",
+    "abbreviation": "GAST",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Georgia Tech",
+    "abbreviation": "GT",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Hawaii",
+    "abbreviation": "HAW",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "Houston",
+    "abbreviation": "HOU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Illinois",
+    "abbreviation": "ILL",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Indiana",
+    "abbreviation": "IND",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Iowa",
+    "abbreviation": "IOWA",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Iowa State",
+    "abbreviation": "ISU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "James Madison",
+    "abbreviation": "JMU",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Kansas",
+    "abbreviation": "KU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Kansas State",
+    "abbreviation": "KSU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Kent State",
+    "abbreviation": "KENT",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Kentucky",
+    "abbreviation": "UK",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Liberty",
+    "abbreviation": "LIB",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "Louisiana",
+    "abbreviation": "ULL",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Louisiana Monroe",
+    "abbreviation": "ULM",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Louisiana Tech",
+    "abbreviation": "LT",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "Louisville",
+    "abbreviation": "LOU",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "LSU",
+    "abbreviation": "LSU",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Marshall",
+    "abbreviation": "MARS",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Maryland",
+    "abbreviation": "UMD",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Memphis",
+    "abbreviation": "MEM",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Miami",
+    "abbreviation": "MIA",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Miami (OH)",
+    "abbreviation": "M-OH",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Michigan",
+    "abbreviation": "MICH",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Michigan State",
+    "abbreviation": "MSU",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Middle Tennessee",
+    "abbreviation": "MTSU",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "Minnesota",
+    "abbreviation": "MINN",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Mississippi State",
+    "abbreviation": "MSST",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Missouri",
+    "abbreviation": "MIZ",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Navy",
+    "abbreviation": "NAVY",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "NC State",
+    "abbreviation": "NCST",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Nebraska",
+    "abbreviation": "NEB",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Nevada",
+    "abbreviation": "NEV",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "New Mexico",
+    "abbreviation": "UNM",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "New Mexico State",
+    "abbreviation": "NMSU",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "North Carolina",
+    "abbreviation": "UNC",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "North Texas",
+    "abbreviation": "UNT",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Northern Illinois",
+    "abbreviation": "NIU",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Northwestern",
+    "abbreviation": "NW",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Notre Dame",
+    "abbreviation": "ND",
+    "conference": "Independent",
+    "logo_url": ""
+  },
+  {
+    "name": "Ohio",
+    "abbreviation": "OHIO",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Ohio State",
+    "abbreviation": "OSU",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Oklahoma",
+    "abbreviation": "OU",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Oklahoma State",
+    "abbreviation": "OKST",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Old Dominion",
+    "abbreviation": "ODU",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Ole Miss",
+    "abbreviation": "MISS",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Oregon",
+    "abbreviation": "ORE",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Oregon State",
+    "abbreviation": "ORST",
+    "conference": "Pac-12",
+    "logo_url": ""
+  },
+  {
+    "name": "Penn State",
+    "abbreviation": "PSU",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Pittsburgh",
+    "abbreviation": "PITT",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Purdue",
+    "abbreviation": "PUR",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Rice",
+    "abbreviation": "RICE",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Rutgers",
+    "abbreviation": "RUT",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Sam Houston",
+    "abbreviation": "SHSU",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "San Diego State",
+    "abbreviation": "SDSU",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "San Jose State",
+    "abbreviation": "SJSU",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "SMU",
+    "abbreviation": "SMU",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "South Alabama",
+    "abbreviation": "USA",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "South Carolina",
+    "abbreviation": "SC",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "South Florida",
+    "abbreviation": "USF",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Southern Miss",
+    "abbreviation": "USM",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Stanford",
+    "abbreviation": "STAN",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Syracuse",
+    "abbreviation": "SYR",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "TCU",
+    "abbreviation": "TCU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Temple",
+    "abbreviation": "TEM",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Tennessee",
+    "abbreviation": "TENN",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Texas",
+    "abbreviation": "TEX",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Texas A&M",
+    "abbreviation": "TAMU",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Texas State",
+    "abbreviation": "TXST",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Texas Tech",
+    "abbreviation": "TTU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Toledo",
+    "abbreviation": "TOL",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Troy",
+    "abbreviation": "TROY",
+    "conference": "Sun Belt",
+    "logo_url": ""
+  },
+  {
+    "name": "Tulane",
+    "abbreviation": "TUL",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Tulsa",
+    "abbreviation": "TLSA",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "UAB",
+    "abbreviation": "UAB",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "UCF",
+    "abbreviation": "UCF",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "UCLA",
+    "abbreviation": "UCLA",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "UConn",
+    "abbreviation": "CONN",
+    "conference": "Independent",
+    "logo_url": ""
+  },
+  {
+    "name": "UMass",
+    "abbreviation": "UMASS",
+    "conference": "Independent",
+    "logo_url": ""
+  },
+  {
+    "name": "UNLV",
+    "abbreviation": "UNLV",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "USC",
+    "abbreviation": "USC",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Utah",
+    "abbreviation": "UTAH",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Utah State",
+    "abbreviation": "USU",
+    "conference": "Mountain West",
+    "logo_url": ""
+  },
+  {
+    "name": "UTEP",
+    "abbreviation": "UTEP",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "UTSA",
+    "abbreviation": "UTSA",
+    "conference": "American",
+    "logo_url": ""
+  },
+  {
+    "name": "Vanderbilt",
+    "abbreviation": "VAN",
+    "conference": "SEC",
+    "logo_url": ""
+  },
+  {
+    "name": "Virginia",
+    "abbreviation": "UVA",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Virginia Tech",
+    "abbreviation": "VT",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Wake Forest",
+    "abbreviation": "WAKE",
+    "conference": "ACC",
+    "logo_url": ""
+  },
+  {
+    "name": "Washington",
+    "abbreviation": "WASH",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Washington State",
+    "abbreviation": "WSU",
+    "conference": "Pac-12",
+    "logo_url": ""
+  },
+  {
+    "name": "West Virginia",
+    "abbreviation": "WVU",
+    "conference": "Big 12",
+    "logo_url": ""
+  },
+  {
+    "name": "Western Kentucky",
+    "abbreviation": "WKU",
+    "conference": "Conference USA",
+    "logo_url": ""
+  },
+  {
+    "name": "Western Michigan",
+    "abbreviation": "WMU",
+    "conference": "MAC",
+    "logo_url": ""
+  },
+  {
+    "name": "Wisconsin",
+    "abbreviation": "WIS",
+    "conference": "Big Ten",
+    "logo_url": ""
+  },
+  {
+    "name": "Wyoming",
+    "abbreviation": "WYO",
+    "conference": "Mountain West",
+    "logo_url": ""
+  }
+]

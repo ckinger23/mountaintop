@@ -1,5 +1,7 @@
 # Backend (Go)
 backend/go.sum
+backend/api
+backend/main
 *.exe
 *.exe~
 *.dll
@@ -10,6 +12,12 @@ backend/go.sum
 /bin/
 /pkg/
 vendor/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+backend/cfb-picks.db
 
 # Frontend (Node.js)
 frontend/node_modules/
