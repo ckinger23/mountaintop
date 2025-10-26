@@ -98,6 +98,9 @@ function GameResultForm({ game, onUpdate, updating }: GameResultFormProps) {
           <div className="text-sm text-gray-500">
             {new Date(game.game_time).toLocaleString()}
           </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Spread: {game.home_team.abbreviation} {game.home_spread > 0 ? '+' : ''}{game.home_spread} | Total: {game.total}
+          </div>
         </div>
         {game.is_final && (
           <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
@@ -136,6 +139,20 @@ function GameResultForm({ game, onUpdate, updating }: GameResultFormProps) {
           />
         </div>
       </div>
+
+      {/* Show total when scores are entered */}
+      {homeScore && awayScore && (
+        <div className="mt-3 text-sm text-center text-gray-600">
+          Total: {parseInt(homeScore) + parseInt(awayScore)}
+          {game.total && (
+            <span className={`ml-2 font-semibold ${
+              parseInt(homeScore) + parseInt(awayScore) > game.total ? 'text-green-600' : 'text-red-600'
+            }`}>
+              ({parseInt(homeScore) + parseInt(awayScore) > game.total ? 'Over' : 'Under'} {game.total})
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-between">
         <label className="flex items-center">

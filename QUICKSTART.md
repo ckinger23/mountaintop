@@ -35,65 +35,29 @@ VITE v5.0.8  ready in XXX ms
 ➜  Local:   http://localhost:3000/
 ```
 
-## Create Your First User
+## Login with Pre-Seeded Admin User
+
+The database automatically seeds an admin user on first run!
 
 1. Open http://localhost:3000 in your browser
-2. Click "Register"
-3. Fill out the form:
-   - Username: `admin`
+2. Click "Login"
+3. Login with:
    - Email: `admin@example.com`
-   - Password: `password123`
-   - Display Name: `Admin User`
-4. Click "Register"
+   - Password: `admin123`
+4. You should see an "Admin" link in the navigation!
 
-## Make Yourself an Admin
+**Note**: If you were already logged in from a previous session and the database was reset, the app will automatically log you out when it detects the token is outdated. Just login again with the admin credentials above.
 
-```bash
-# In a new terminal
-sqlite3 backend/cfb-picks.db
-```
+## What's Pre-Seeded?
 
-```sql
-UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com';
-.quit
-```
+The database automatically includes:
+- **Admin user**: admin@example.com / admin123
+- **132 teams**: All major college football teams
+- **2025 Season**: Active season ready to go
+- **3 Weeks**: Week 1, 2, and 3 with proper lock times
+- **12 Games**: 4 games per week with realistic matchups
 
-Refresh your browser and you should now see an "Admin" link in the navigation!
-
-## What's Next?
-
-### As Admin, you need to:
-1. Create a Season (currently manual via database or add admin UI)
-2. Create Weeks for that season
-3. Create Games for each week
-
-### For now, here's a quick database setup:
-
-```bash
-sqlite3 backend/cfb-picks.db
-```
-
-```sql
--- Create a season
-INSERT INTO seasons (created_at, updated_at, year, name, is_active) 
-VALUES (datetime('now'), datetime('now'), 2025, '2025 Season', 1);
-
--- Create a week (adjust season_id if needed)
-INSERT INTO weeks (created_at, updated_at, season_id, week_number, name, lock_time) 
-VALUES (datetime('now'), datetime('now'), 1, 1, 'Week 1', datetime('now', '+7 days'));
-
--- Create a game (adjust week_id and team IDs as needed)
--- Teams 1-8 were seeded: Alabama, Georgia, Ohio State, Michigan, Texas, USC, Oregon, Penn State
-INSERT INTO games (created_at, updated_at, week_id, home_team_id, away_team_id, game_time, home_spread, is_final) 
-VALUES (datetime('now'), datetime('now'), 1, 1, 2, datetime('now', '+5 days'), -3.5, 0);
-
-INSERT INTO games (created_at, updated_at, week_id, home_team_id, away_team_id, game_time, home_spread, is_final) 
-VALUES (datetime('now'), datetime('now'), 1, 3, 4, datetime('now', '+5 days'), -7.0, 0);
-
-.quit
-```
-
-Now refresh your browser and you should see games to pick!
+You're ready to start making picks immediately!
 
 ## Testing the Full Flow
 
@@ -116,7 +80,7 @@ Now refresh your browser and you should see games to pick!
 - Try deleting `node_modules` and running `npm install` again
 
 ### Can't see games
-- Make sure you created a season, week, and games in the database
+- Games are automatically seeded on first run - check the backend logs
 - Check that the week's lock_time is in the future
 
 ### Picks won't submit
@@ -125,9 +89,17 @@ Now refresh your browser and you should see games to pick!
 
 ## Next Steps
 
-- Add more teams to the database
-- Create more weeks and games
+- Create additional users for your picks pool
+- Add more weeks and games as needed
 - Invite friends to join your pool!
-- Consider building admin UI pages to avoid manual database work
+- Consider building admin UI pages for easier season/week/game management
+
+## Need to Reset?
+
+To start fresh with a new database:
+```bash
+rm backend/cfb-picks.db
+# Then restart the backend - it will auto-seed everything again
+```
 
 Enjoy your picks pool! 🏈

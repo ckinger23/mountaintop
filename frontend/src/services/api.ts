@@ -88,10 +88,11 @@ export const gamesService = {
 
 // Picks
 export const picksService = {
-  submitPick: async (gameId: number, pickedTeamId: number, confidence?: number): Promise<Pick> => {
+  submitPick: async (gameId: number, pickedTeamId: number, pickedOverUnder: string, confidence?: number): Promise<Pick> => {
     const { data } = await api.post<Pick>('/picks', {
       game_id: gameId,
       picked_team_id: pickedTeamId,
+      picked_over_under: pickedOverUnder,
       confidence,
     });
     return data;

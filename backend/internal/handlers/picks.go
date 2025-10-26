@@ -12,9 +12,10 @@ import (
 )
 
 type SubmitPickRequest struct {
-	GameID       uint `json:"game_id"`
-	PickedTeamID uint `json:"picked_team_id"`
-	Confidence   int  `json:"confidence"`
+	GameID          uint   `json:"game_id"`
+	PickedTeamID    uint   `json:"picked_team_id"`
+	PickedOverUnder string `json:"picked_over_under"` // "over" or "under"
+	Confidence      int    `json:"confidence"`
 }
 
 // SubmitPick returns a handler for creating or updating a user's pick for a game
@@ -57,6 +58,12 @@ func SubmitPick(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// Validate over/under pick
+		if req.PickedOverUnder != "over" && req.PickedOverUnder != "under" {
+			http.Error(w, "Must pick 'over' or 'under' for total", http.StatusBadRequest)
+			return
+		}
+
 		// Check if pick already exists
 		var existingPick models.Pick
 		err := a.DB.Where("user_id = ? AND game_id = ?", claims.UserID, req.GameID).First(&existingPick).Error
@@ -64,6 +71,7 @@ func SubmitPick(a *app.App) http.HandlerFunc {
 		if err == nil {
 			// Update existing pick
 			existingPick.PickedTeamID = req.PickedTeamID
+			existingPick.PickedOverUnder = req.PickedOverUnder
 			existingPick.Confidence = req.Confidence
 
 			if err := a.DB.Save(&existingPick).Error; err != nil {
@@ -79,10 +87,11 @@ func SubmitPick(a *app.App) http.HandlerFunc {
 
 		// Create new pick
 		pick := models.Pick{
-			UserID:       claims.UserID,
-			GameID:       req.GameID,
-			PickedTeamID: req.PickedTeamID,
-			Confidence:   req.Confidence,
+			UserID:          claims.UserID,
+			GameID:          req.GameID,
+			PickedTeamID:    req.PickedTeamID,
+			PickedOverUnder: req.PickedOverUnder,
+			Confidence:      req.Confidence,
 		}
 
 		if err := a.DB.Create(&pick).Error; err != nil {

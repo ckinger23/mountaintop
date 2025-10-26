@@ -38,6 +38,7 @@ export interface Game {
   away_team_id: number;
   game_time: string;
   home_spread: number;
+  total: number;
   is_final: boolean;
   home_score?: number;
   away_score?: number;
@@ -52,8 +53,10 @@ export interface Pick {
   user_id: number;
   game_id: number;
   picked_team_id: number;
+  picked_over_under: string; // "over" or "under"
   confidence?: number;
-  is_correct?: boolean;
+  spread_correct?: boolean;
+  over_under_correct?: boolean;
   points_earned: number;
   game: Game;
   picked_team: Team;

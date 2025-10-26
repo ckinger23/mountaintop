@@ -191,16 +191,17 @@ The frontend automatically proxies API requests to `http://localhost:8080` durin
 ## 🧪 Testing the Application
 
 1. Start both backend and frontend
-2. Register a new user at `http://localhost:3000/login`
-3. To create an admin user, you'll need to manually update the database:
-   ```bash
-   sqlite3 backend/cfb-picks.db
-   UPDATE users SET is_admin = 1 WHERE email = 'your@email.com';
-   ```
-4. As admin, create a season, weeks, and games
-5. Submit picks before game time
-6. Enter game results as admin
-7. View updated leaderboard
+2. Login with the pre-seeded admin user:
+   - Email: `admin@example.com`
+   - Password: `admin123`
+3. The database automatically seeds on first run with:
+   - Admin user (admin@example.com / admin123)
+   - 132 college football teams
+   - 2025 season with 3 weeks
+   - 12 sample games (4 per week)
+4. As admin, submit picks before game time
+5. Enter game results in the Admin panel
+6. View updated leaderboard with automatic scoring
 
 ## 🔄 Next Steps
 

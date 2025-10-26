@@ -31,12 +31,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // check local storage for jwt
       if (authService.isAuthenticated()) {
         try {
-          // api call to get user info
+          // api call to get user info - this validates the token against the current database
           const currentUser = await authService.getCurrentUser();
           setUser(currentUser);
         } catch (error) {
-          // clears everything if expired/invalid
-          console.error('Failed to load user:', error);
+          // clears everything if expired/invalid token
+          // This handles cases where:
+          // 1. Token is expired
+          // 2. Token is invalid
+          // 3. Database was reset and user no longer exists
+          // 4. User permissions changed (e.g., admin status)
+          console.error('Failed to load user, clearing auth:', error);
           authService.logout();
         }
       }

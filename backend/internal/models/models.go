@@ -79,7 +79,8 @@ type Game struct {
 	AwayTeamID  uint       `gorm:"not null" json:"away_team_id"`
 	GameTime    time.Time  `json:"game_time"`
 	HomeSpread  float64    `json:"home_spread"` // Negative means home team favored
-	
+	Total       float64    `json:"total"`       // Over/under line for combined score
+
 	// Game Results (null until game is final)
 	IsFinal      bool  `gorm:"default:false" json:"is_final"`
 	HomeScore    *int  `json:"home_score"`
@@ -100,14 +101,16 @@ type Pick struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 	
-	UserID         uint `gorm:"not null;uniqueIndex:idx_user_game" json:"user_id"`
-	GameID         uint `gorm:"not null;uniqueIndex:idx_user_game" json:"game_id"`
-	PickedTeamID   uint `gorm:"not null" json:"picked_team_id"`
-	Confidence     int  `json:"confidence"` // Optional: for confidence pools
-	
-	// Scoring
-	IsCorrect   *bool `json:"is_correct"` // null until game is final
-	PointsEarned int  `gorm:"default:0" json:"points_earned"`
+	UserID         uint   `gorm:"not null;uniqueIndex:idx_user_game" json:"user_id"`
+	GameID         uint   `gorm:"not null;uniqueIndex:idx_user_game" json:"game_id"`
+	PickedTeamID   uint   `gorm:"not null" json:"picked_team_id"`
+	PickedOverUnder string `json:"picked_over_under"` // "over" or "under"
+	Confidence     int    `json:"confidence"`         // Optional: for confidence pools
+
+	// Scoring (one point for spread pick, one point for over/under pick)
+	SpreadCorrect     *bool `json:"spread_correct"`      // null until game is final
+	OverUnderCorrect  *bool `json:"over_under_correct"`  // null until game is final
+	PointsEarned      int   `gorm:"default:0" json:"points_earned"`
 	
 	// Relationships
 	User        User `gorm:"foreignKey:UserID" json:"user,omitempty"`

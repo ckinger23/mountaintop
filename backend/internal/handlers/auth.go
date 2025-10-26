@@ -137,6 +137,13 @@ func GetCurrentUser(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		// Validate that token claims match current database state
+		// This handles cases where user permissions changed after token was issued
+		if user.Email != claims.Email || user.IsAdmin != claims.IsAdmin {
+			http.Error(w, "Token claims outdated, please login again", http.StatusUnauthorized)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(user)
 	}

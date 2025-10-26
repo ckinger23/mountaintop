@@ -167,15 +167,30 @@ func calculatePickResults(db *gorm.DB, gameID uint) error {
 		return err
 	}
 
-	for _, pick := range picks {
-		isCorrect := pick.PickedTeamID == *game.WinnerTeamID
-		pick.IsCorrect = &isCorrect
+	// Calculate actual total score
+	actualTotal := float64(*game.HomeScore + *game.AwayScore)
 
-		// Simple scoring: 1 point for correct pick
-		if isCorrect {
-			pick.PointsEarned = 1
-		} else {
-			pick.PointsEarned = 0
+	for _, pick := range picks {
+		// Check spread pick correctness
+		spreadCorrect := pick.PickedTeamID == *game.WinnerTeamID
+		pick.SpreadCorrect = &spreadCorrect
+
+		// Check over/under pick correctness
+		var overUnderCorrect bool
+		if pick.PickedOverUnder == "over" {
+			overUnderCorrect = actualTotal > game.Total
+		} else { // "under"
+			overUnderCorrect = actualTotal < game.Total
+		}
+		pick.OverUnderCorrect = &overUnderCorrect
+
+		// Scoring: 1 point for correct spread, 1 point for correct over/under (max 2 points per game)
+		pick.PointsEarned = 0
+		if spreadCorrect {
+			pick.PointsEarned++
+		}
+		if overUnderCorrect {
+			pick.PointsEarned++
 		}
 
 		db.Save(&pick)
