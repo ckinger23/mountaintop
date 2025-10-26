@@ -12,6 +12,10 @@ export default function Register() {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // stops the browser's default behavior for an event from happening
+    // For form submission, stops browser from reloading page
+    // essential for SPAs where you handle form submissions via JS/axios/fetch
+    // instead of traditional form posts
     e.preventDefault();
     setError('');
     
@@ -21,6 +25,7 @@ export default function Register() {
     }
 
     try {
+      // use register from useAuth() hook
       await register(username, email, password, displayName);
       navigate('/');
     } catch (err: any) {

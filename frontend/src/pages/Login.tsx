@@ -7,6 +7,10 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const { login } = useAuth();
+  // hook for programmatic navigation
+  // navigate to different routes in your app without <Link> components
+  // Redirect users after action completes
+  // e.g. navigate('/home') or navigate(-1) to go back one step
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -14,7 +18,9 @@ export default function Login() {
     setError('');
     
     try {
+      // login method from the the useAuth() hook
       await login(email, password);
+      // After login, go home
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data || 'Login failed. Please try again.');

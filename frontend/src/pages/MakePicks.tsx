@@ -9,7 +9,18 @@ export default function MakePicks() {
   const [loading, setLoading] = useState(true);
   const [currentWeekId, setCurrentWeekId] = useState<number | null>(null);
 
+  // useEffect() hook lets you perform side effects in React functional components
+  // Side effects are operations that interact with things outside the component's
+  // render logic, like API calls, subscriptions, timers, DOM manipulation
+  // Effect function runs after component renders
+  // cleanup function (empty in this scenario) runs before the effect runs again
+  // or when component unmounts
+  // Dependency array (empty here) controls when the effect re-runs
+  // Dependency array: [] -> run once on mount
+  // [a, b] -> run on mount and when a or b changes
+  // No list -> run on every render (usually avoid this)
   useEffect(() => {
+    // load the data from API once after page renders
     loadData();
   }, []);
 

@@ -106,6 +106,13 @@ function AppRoutes() {
 
 function App() {
   return (
+    // React apps are SPA's (Single Page Applications)
+    // Server sends One HTML page with Javascript
+    // Clicking links doesn't reload the page - JavaScript swaps out components instead
+    // still want unique urls, back/forward buttons work, bookmark/share URLs
+    // BrowserRouter is kind of like Context
+    // listens to the browser's url bar, provides url info to each component
+    // Updates components when the URL chnages
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />

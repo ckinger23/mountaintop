@@ -6,9 +6,18 @@ const api = axios.create({
 });
 
 // Add auth token to requests
+// registers a function that is run before every HTTP request
 api.interceptors.request.use((config) => {
+  // retrieve jwt stored when user logged in
+  // localstorage is a builti-in browser API from the Web Storage spec
+  // Not from react, npm package, or code
+  // native feature of all modern web browsers
+  // persists data even after closing the browser
+  // 5-10 MB storage limit
+  // Synchronous (blocking)
   const token = localStorage.getItem('token');
   if (token) {
+    // add token to the header before API call
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
