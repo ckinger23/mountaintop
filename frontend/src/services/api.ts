@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Game, Pick, Week, Team, LeaderboardEntry } from '../types';
+import { AuthResponse, User, Game, Pick, Week, Team, LeaderboardEntry, Season } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -84,6 +84,11 @@ export const gamesService = {
     const { data } = await api.get<Team[]>('/teams');
     return data;
   },
+
+  getSeasons: async (): Promise<Season[]> => {
+    const { data } = await api.get<Season[]>('/seasons');
+    return data;
+  },
 };
 
 // Picks
@@ -127,6 +132,35 @@ export const leaderboardService = {
 
 // Admin
 export const adminService = {
+  // Game management
+  createGame: async (weekId: number, homeTeamId: number, awayTeamId: number, gameTime: string, homeSpread: number, total: number): Promise<Game> => {
+    const { data } = await api.post<Game>('/admin/games', {
+      week_id: weekId,
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      game_time: gameTime,
+      home_spread: homeSpread,
+      total,
+    });
+    return data;
+  },
+
+  updateGame: async (gameId: number, weekId: number, homeTeamId: number, awayTeamId: number, gameTime: string, homeSpread: number, total: number): Promise<Game> => {
+    const { data } = await api.put<Game>(`/admin/games/${gameId}`, {
+      week_id: weekId,
+      home_team_id: homeTeamId,
+      away_team_id: awayTeamId,
+      game_time: gameTime,
+      home_spread: homeSpread,
+      total,
+    });
+    return data;
+  },
+
+  deleteGame: async (gameId: number): Promise<void> => {
+    await api.delete(`/admin/games/${gameId}`);
+  },
+
   updateGameResult: async (gameId: number, homeScore: number, awayScore: number, isFinal: boolean): Promise<Game> => {
     const { data } = await api.put<Game>(`/admin/games/${gameId}/result`, {
       home_score: homeScore,
@@ -136,13 +170,33 @@ export const adminService = {
     return data;
   },
 
-  createGame: async (weekId: number, homeTeamId: number, awayTeamId: number, gameTime: string, homeSpread: number): Promise<Game> => {
-    const { data } = await api.post<Game>('/admin/games', {
-      week_id: weekId,
-      home_team_id: homeTeamId,
-      away_team_id: awayTeamId,
-      game_time: gameTime,
-      home_spread: homeSpread,
+  // Week management
+  createWeek: async (seasonId: number, weekNumber: number, name: string, lockTime: string): Promise<Week> => {
+    const { data } = await api.post<Week>('/admin/weeks', {
+      season_id: seasonId,
+      week_number: weekNumber,
+      name,
+      lock_time: lockTime,
+    });
+    return data;
+  },
+
+  updateWeek: async (weekId: number, seasonId: number, weekNumber: number, name: string, lockTime: string): Promise<Week> => {
+    const { data } = await api.put<Week>(`/admin/weeks/${weekId}`, {
+      season_id: seasonId,
+      week_number: weekNumber,
+      name,
+      lock_time: lockTime,
+    });
+    return data;
+  },
+
+  // Season management
+  createSeason: async (year: number, name: string, isActive: boolean) => {
+    const { data } = await api.post('/admin/seasons', {
+      year,
+      name,
+      is_active: isActive,
     });
     return data;
   },

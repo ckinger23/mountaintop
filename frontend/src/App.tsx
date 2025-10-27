@@ -4,7 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import MakePicks from './pages/MakePicks';
 import Leaderboard from './pages/Leaderboard';
-import Admin from './pages/Admin';
+import AdminNew from './pages/AdminNew';
 
 function Navigation() {
   const { user, logout } = useAuth();
@@ -95,7 +95,7 @@ function AppRoutes() {
           path="/admin"
           element={
             <ProtectedRoute>
-              <Admin />
+              <AdminNew />
             </ProtectedRoute>
           }
         />

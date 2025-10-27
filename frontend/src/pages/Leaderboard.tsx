@@ -74,7 +74,10 @@ export default function Leaderboard() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
                   <div className="text-sm text-gray-900">
-                    {entry.correct_picks} - {entry.total_picks - entry.correct_picks}
+                    {entry.correct_picks} / {entry.total_picks * 2}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    ({entry.total_picks} games)
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center">

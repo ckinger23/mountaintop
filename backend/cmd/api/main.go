@@ -99,6 +99,8 @@ func main() {
 
 		// Game management
 		r.Post("/api/admin/games", handlers.CreateGame(application))
+		r.Put("/api/admin/games/{id}", handlers.UpdateGame(application))
+		r.Delete("/api/admin/games/{id}", handlers.DeleteGame(application))
 		r.Put("/api/admin/games/{id}/result", handlers.UpdateGameResult(application))
 
 		// Season management
@@ -106,6 +108,7 @@ func main() {
 
 		// Week management
 		r.Post("/api/admin/weeks", handlers.CreateWeek(application))
+		r.Put("/api/admin/weeks/{id}", handlers.UpdateWeek(application))
 	})
 
 	// Start server

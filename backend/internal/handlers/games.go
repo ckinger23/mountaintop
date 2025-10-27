@@ -85,6 +85,7 @@ func CreateGame(a *app.App) http.HandlerFunc {
 			AwayTeamID: req.AwayTeamID,
 			GameTime:   gameTime,
 			HomeSpread: req.HomeSpread,
+			Total:      req.Total,
 		}
 
 		if err := a.DB.Create(&game).Error; err != nil {
@@ -98,6 +99,84 @@ func CreateGame(a *app.App) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(game)
+	}
+}
+
+// UpdateGame returns a handler for updating game details (admin only)
+func UpdateGame(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gameID := chi.URLParam(r, "id")
+
+		var game models.Game
+		if err := a.DB.First(&game, gameID).Error; err != nil {
+			http.Error(w, "Game not found", http.StatusNotFound)
+			return
+		}
+
+		var req CreateGameRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		// Parse game time
+		gameTime, err := time.Parse(time.RFC3339, req.GameTime)
+		if err != nil {
+			http.Error(w, "Invalid game_time format", http.StatusBadRequest)
+			return
+		}
+
+		// Update game fields
+		game.WeekID = req.WeekID
+		game.HomeTeamID = req.HomeTeamID
+		game.AwayTeamID = req.AwayTeamID
+		game.GameTime = gameTime
+		game.HomeSpread = req.HomeSpread
+		game.Total = req.Total
+
+		if err := a.DB.Save(&game).Error; err != nil {
+			http.Error(w, "Error updating game", http.StatusInternalServerError)
+			return
+		}
+
+		// Load relationships
+		a.DB.Preload("HomeTeam").Preload("AwayTeam").Preload("Week").First(&game, game.ID)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(game)
+	}
+}
+
+// DeleteGame returns a handler for deleting a game (admin only)
+func DeleteGame(a *app.App) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gameID := chi.URLParam(r, "id")
+
+		var game models.Game
+		if err := a.DB.First(&game, gameID).Error; err != nil {
+			http.Error(w, "Game not found", http.StatusNotFound)
+			return
+		}
+
+		// Don't allow deleting games that are final or have picks
+		if game.IsFinal {
+			http.Error(w, "Cannot delete a final game", http.StatusForbidden)
+			return
+		}
+
+		var pickCount int64
+		a.DB.Model(&models.Pick{}).Where("game_id = ?", gameID).Count(&pickCount)
+		if pickCount > 0 {
+			http.Error(w, "Cannot delete a game with existing picks", http.StatusForbidden)
+			return
+		}
+
+		if err := a.DB.Delete(&game).Error; err != nil {
+			http.Error(w, "Error deleting game", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

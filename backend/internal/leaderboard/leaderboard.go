@@ -27,15 +27,17 @@ func (q *Query) Execute() ([]models.LeaderboardEntry, error) {
 	var results []models.LeaderboardEntry
 
 	// Start with base query selecting from users
+	// Note: We count total correct picks (spread + over/under), but total_picks is number of games
+	// Each game can contribute 0-2 points (1 for spread, 1 for over/under)
 	query := q.db.Table("users u").
 		Select(`
 			u.id as user_id,
 			u.username,
 			u.display_name,
 			COALESCE(SUM(p.points_earned), 0) as total_points,
-			COALESCE(SUM(CASE WHEN p.is_correct = 1 THEN 1 ELSE 0 END), 0) as correct_picks,
+			COALESCE(SUM(CASE WHEN p.spread_correct = 1 THEN 1 ELSE 0 END) + SUM(CASE WHEN p.over_under_correct = 1 THEN 1 ELSE 0 END), 0) as correct_picks,
 			COUNT(p.id) as total_picks,
-			COALESCE(CAST(SUM(CASE WHEN p.is_correct = 1 THEN 1 ELSE 0 END) AS FLOAT) / NULLIF(COUNT(p.id), 0), 0) as win_pct
+			COALESCE(CAST(SUM(p.points_earned) AS FLOAT) / NULLIF(COUNT(p.id) * 2, 0), 0) as win_pct
 		`).
 		Joins("LEFT JOIN picks p ON u.id = p.user_id").
 		Joins("LEFT JOIN games g ON p.game_id = g.id").
