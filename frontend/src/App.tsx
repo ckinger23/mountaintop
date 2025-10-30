@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import MakePicks from './pages/MakePicks';
 import Leaderboard from './pages/Leaderboard';
-import AdminNew from './pages/AdminNew';
+import Admin from './pages/Admin';
 
 function Navigation() {
   const { user, logout } = useAuth();
@@ -95,7 +96,7 @@ function AppRoutes() {
           path="/admin"
           element={
             <ProtectedRoute>
-              <AdminNew />
+              <Admin />
             </ProtectedRoute>
           }
         />
@@ -116,6 +117,33 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#fff',
+              color: '#374151',
+              padding: '16px',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+            },
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 5000,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
       </AuthProvider>
     </BrowserRouter>
   );

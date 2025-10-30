@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { adminService } from '../../../services/api';
 import Modal from '../../Modal';
 
@@ -23,10 +24,10 @@ export default function CreateSeasonModal({
     setSubmitting(true);
     try {
       await adminService.createSeason(parseInt(year), name, isActive);
-      alert('Season created successfully!');
+      toast.success('Season created successfully!');
       onSuccess();
     } catch (error: any) {
-      alert(error.response?.data || 'Failed to create season');
+      toast.error(error.response?.data || 'Failed to create season');
     } finally {
       setSubmitting(false);
     }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { adminService } from '../../../services/api';
 import { Season } from '../../../types';
 import Modal from '../../Modal';
@@ -7,6 +8,7 @@ interface CreateWeekModalProps {
   isOpen: boolean;
   onClose: () => void;
   seasons: Season[];
+  defaultSeasonId?: number;
   onSuccess: () => void;
 }
 
@@ -14,9 +16,10 @@ export default function CreateWeekModal({
   isOpen,
   onClose,
   seasons,
+  defaultSeasonId,
   onSuccess
 }: CreateWeekModalProps) {
-  const [seasonId, setSeasonId] = useState('');
+  const [seasonId, setSeasonId] = useState(defaultSeasonId?.toString() || '');
   const [weekNumber, setWeekNumber] = useState('');
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -30,10 +33,10 @@ export default function CreateWeekModal({
         parseInt(weekNumber),
         name
       );
-      alert('Week created successfully! Week is in "Creating" status. Add games, then open it for picks.');
+      toast.success('Week created successfully! Week is in "Creating" status.');
       onSuccess();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to create week');
+      toast.error(error.response?.data?.error || 'Failed to create week');
     } finally {
       setSubmitting(false);
     }

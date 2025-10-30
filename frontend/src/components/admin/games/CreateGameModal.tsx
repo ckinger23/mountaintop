@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import '../../../styles/datepicker.css';
 import { adminService } from '../../../services/api';
 import { Team, Week } from '../../../types';
 import Modal from '../../Modal';
@@ -20,7 +24,7 @@ export default function CreateGameModal({
 }: CreateGameModalProps) {
   const [homeTeamId, setHomeTeamId] = useState('');
   const [awayTeamId, setAwayTeamId] = useState('');
-  const [gameTime, setGameTime] = useState('');
+  const [gameTime, setGameTime] = useState<Date | null>(null);
   const [homeSpread, setHomeSpread] = useState('');
   const [total, setTotal] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -28,14 +32,19 @@ export default function CreateGameModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentWeek) {
-      alert('No current week found. Please create a week first.');
+      toast.error('No current week found. Please create a week first.');
+      return;
+    }
+
+    if (!gameTime) {
+      toast.error('Please select a game time');
       return;
     }
 
     setSubmitting(true);
     try {
-      // Convert datetime-local format to ISO 8601
-      const isoGameTime = new Date(gameTime).toISOString();
+      // Convert Date object to ISO 8601
+      const isoGameTime = gameTime.toISOString();
 
       await adminService.createGame(
         currentWeek.id,
@@ -45,10 +54,10 @@ export default function CreateGameModal({
         parseFloat(homeSpread),
         parseFloat(total)
       );
-      alert('Game created successfully!');
+      toast.success('Game created successfully!');
       onSuccess();
     } catch (error: any) {
-      alert(error.response?.data || 'Failed to create game');
+      toast.error(error.response?.data || 'Failed to create game');
     } finally {
       setSubmitting(false);
     }
@@ -98,14 +107,26 @@ export default function CreateGameModal({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Game Time
+            <span className="ml-2 text-xs font-normal text-blue-600">
+              ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+            </span>
           </label>
-          <input
-            type="datetime-local"
-            value={gameTime}
-            onChange={(e) => setGameTime(e.target.value)}
+          <DatePicker
+            selected={gameTime}
+            onChange={(date: Date | null) => setGameTime(date)}
+            showTimeSelect
+            timeFormat="HH:mm"
+            timeIntervals={15}
+            dateFormat="MMMM d, yyyy h:mm aa"
+            minDate={new Date()}
             className="w-full px-3 py-2 border rounded-md"
-            required
+            placeholderText="Select date and time"
+            wrapperClassName="w-full"
+            portalId="root-portal"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Your local timezone
+          </p>
         </div>
 
         <div>
