@@ -171,23 +171,38 @@ export const adminService = {
   },
 
   // Week management
-  createWeek: async (seasonId: number, weekNumber: number, name: string, lockTime: string): Promise<Week> => {
+  createWeek: async (seasonId: number, weekNumber: number, name: string): Promise<Week> => {
     const { data } = await api.post<Week>('/admin/weeks', {
       season_id: seasonId,
       week_number: weekNumber,
       name,
-      lock_time: lockTime,
     });
     return data;
   },
 
-  updateWeek: async (weekId: number, seasonId: number, weekNumber: number, name: string, lockTime: string): Promise<Week> => {
+  updateWeek: async (weekId: number, seasonId: number, weekNumber: number, name: string): Promise<Week> => {
     const { data } = await api.put<Week>(`/admin/weeks/${weekId}`, {
       season_id: seasonId,
       week_number: weekNumber,
       name,
-      lock_time: lockTime,
     });
+    return data;
+  },
+
+  openWeekForPicks: async (weekId: number, pickDeadline: string): Promise<Week> => {
+    const { data } = await api.put<Week>(`/admin/weeks/${weekId}/open`, {
+      pick_deadline: pickDeadline,
+    });
+    return data;
+  },
+
+  lockWeek: async (weekId: number): Promise<Week> => {
+    const { data } = await api.put<Week>(`/admin/weeks/${weekId}/lock`);
+    return data;
+  },
+
+  completeWeek: async (weekId: number): Promise<Week> => {
+    const { data } = await api.put<Week>(`/admin/weeks/${weekId}/complete`);
     return data;
   },
 

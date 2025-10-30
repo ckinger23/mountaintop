@@ -151,8 +151,7 @@ func seedDevelopmentData(db *gorm.DB) error {
 			SeasonID:   season.ID,
 			WeekNumber: weekNum,
 			Name:       fmt.Sprintf("Week %d", weekNum),
-			// Lock time is 7 days from now for week 1, then +7 days for each subsequent week
-			LockTime:   now.AddDate(0, 0, 7*weekNum),
+			Status:     "creating", // New weeks start in creating status
 		}
 		if err := db.Create(&week).Error; err != nil {
 			return fmt.Errorf("failed to create week %d: %w", weekNum, err)

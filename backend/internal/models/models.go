@@ -43,12 +43,13 @@ type Week struct {
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-	
-	SeasonID    uint      `gorm:"not null" json:"season_id"`
-	WeekNumber  int       `gorm:"not null" json:"week_number"`
-	Name        string    `json:"name"` // e.g., "Week 8"
-	LockTime    time.Time `json:"lock_time"` // When picks must be submitted by
-	
+
+	SeasonID     uint       `gorm:"not null" json:"season_id"`
+	WeekNumber   int        `gorm:"not null" json:"week_number"`
+	Name         string     `json:"name"` // e.g., "Week 8"
+	Status       string     `gorm:"default:'creating'" json:"status"` // creating, picking, scoring, finished
+	PickDeadline *time.Time `json:"pick_deadline"` // When picks must be submitted by (set when transitioning to 'picking')
+
 	// Relationships
 	Season Season `gorm:"foreignKey:SeasonID" json:"season,omitempty"`
 	Games  []Game `gorm:"foreignKey:WeekID" json:"games,omitempty"`

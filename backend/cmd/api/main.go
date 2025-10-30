@@ -109,6 +109,9 @@ func main() {
 		// Week management
 		r.Post("/api/admin/weeks", handlers.CreateWeek(application))
 		r.Put("/api/admin/weeks/{id}", handlers.UpdateWeek(application))
+		r.Put("/api/admin/weeks/{id}/open", handlers.OpenWeekForPicks(application))
+		r.Put("/api/admin/weeks/{id}/lock", handlers.LockWeek(application))
+		r.Put("/api/admin/weeks/{id}/complete", handlers.CompleteWeek(application))
 	})
 
 	// Start server

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ckinger23/mountaintop/internal/app"
 	"github.com/ckinger23/mountaintop/internal/models"
+	"github.com/ckinger23/mountaintop/internal/validation"
 )
 
 type CreateSeasonRequest struct {
@@ -18,7 +19,22 @@ func CreateSeason(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateSeasonRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			validation.RespondWithError(w, http.StatusBadRequest, "Invalid request body", "INVALID_JSON", nil)
+			return
+		}
+
+		// Validate season data
+		if valErr := validation.ValidateCreateSeason(req.Year, req.Name); valErr != nil {
+			validation.RespondWithValidationError(w, valErr)
+			return
+		}
+
+		// Check if season with this year already exists
+		var existingSeason models.Season
+		if err := a.DB.Where("year = ?", req.Year).First(&existingSeason).Error; err == nil {
+			validation.RespondWithError(w, http.StatusConflict, "Season already exists", "SEASON_EXISTS", map[string]string{
+				"year": "A season for this year already exists",
+			})
 			return
 		}
 
@@ -26,17 +42,15 @@ func CreateSeason(a *app.App) http.HandlerFunc {
 			Year:     req.Year,
 			Name:     req.Name,
 			IsActive: req.IsActive,
-			// Do not set weeks
 		}
 
 		if err := a.DB.Create(&season).Error; err != nil {
-			http.Error(w, "Error creating season", http.StatusInternalServerError)
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error creating season", "DATABASE_ERROR", nil)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(season)
-
 	}
 }

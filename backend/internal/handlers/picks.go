@@ -33,22 +33,28 @@ func SubmitPick(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Get the game to check lock time
+		// Get the game to check week status and pick deadline
 		var game models.Game
 		if err := a.DB.Preload("Week").First(&game, req.GameID).Error; err != nil {
 			http.Error(w, "Game not found", http.StatusNotFound)
 			return
 		}
 
-		// Check if picks are still allowed (before lock time)
-		if time.Now().After(game.Week.LockTime) {
-			http.Error(w, "Picks are locked for this week", http.StatusForbidden)
+		// Check if week is in 'picking' status
+		if game.Week.Status != "picking" {
+			http.Error(w, "Picks are not open for this week", http.StatusForbidden)
 			return
 		}
 
-		// Check if game has already started or is final
-		if game.IsFinal || time.Now().After(game.GameTime) {
-			http.Error(w, "Cannot pick a game that has already started", http.StatusForbidden)
+		// Check if pick deadline has passed
+		if game.Week.PickDeadline != nil && time.Now().After(*game.Week.PickDeadline) {
+			http.Error(w, "Pick deadline has passed for this week", http.StatusForbidden)
+			return
+		}
+
+		// Check if game is final
+		if game.IsFinal {
+			http.Error(w, "Cannot pick a game that is final", http.StatusForbidden)
 			return
 		}
 
@@ -183,16 +189,16 @@ func GetAllPicksForWeek(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		weekID := chi.URLParam(r, "weekId")
 
-		// Get the week to check lock time
+		// Get the week to check status
 		var week models.Week
 		if err := a.DB.First(&week, weekID).Error; err != nil {
 			http.Error(w, "Week not found", http.StatusNotFound)
 			return
 		}
 
-		// Check if week is locked
-		if time.Now().Before(week.LockTime) {
-			// Only admins can view before lock time
+		// Check if week is locked (in scoring or finished status)
+		if week.Status == "creating" || week.Status == "picking" {
+			// Only admins can view before week is locked
 			claims, ok := middleware.GetUserFromContext(r)
 			if !ok || !claims.IsAdmin {
 				http.Error(w, "Picks not yet visible", http.StatusForbidden)

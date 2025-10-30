@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/ckinger23/mountaintop/internal/app"
 	"github.com/ckinger23/mountaintop/internal/leaderboard"
 	"github.com/ckinger23/mountaintop/internal/models"
+	"github.com/ckinger23/mountaintop/internal/validation"
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
@@ -68,14 +68,44 @@ func CreateGame(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req CreateGameRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			validation.RespondWithError(w, http.StatusBadRequest, "Invalid request body", "INVALID_JSON", nil)
 			return
 		}
 
-		// Parse game time
-		gameTime, err := time.Parse(time.RFC3339, req.GameTime)
-		if err != nil {
-			http.Error(w, "Invalid game_time format", http.StatusBadRequest)
+		// Validate and parse game time
+		gameTime, valErr := validation.ValidateGameTime(req.GameTime)
+		if valErr != nil {
+			validation.RespondWithValidationError(w, valErr)
+			return
+		}
+
+		// Validate game data
+		if valErr := validation.ValidateCreateGame(req.WeekID, req.HomeTeamID, req.AwayTeamID, gameTime, req.HomeSpread, req.Total); valErr != nil {
+			validation.RespondWithValidationError(w, valErr)
+			return
+		}
+
+		// Check that week exists
+		var week models.Week
+		if err := a.DB.First(&week, req.WeekID).Error; err != nil {
+			validation.RespondWithError(w, http.StatusBadRequest, "Week not found", "WEEK_NOT_FOUND", map[string]string{
+				"week_id": "The specified week does not exist",
+			})
+			return
+		}
+
+		// Check that teams exist
+		var homeTeam, awayTeam models.Team
+		if err := a.DB.First(&homeTeam, req.HomeTeamID).Error; err != nil {
+			validation.RespondWithError(w, http.StatusBadRequest, "Home team not found", "TEAM_NOT_FOUND", map[string]string{
+				"home_team_id": "The specified home team does not exist",
+			})
+			return
+		}
+		if err := a.DB.First(&awayTeam, req.AwayTeamID).Error; err != nil {
+			validation.RespondWithError(w, http.StatusBadRequest, "Away team not found", "TEAM_NOT_FOUND", map[string]string{
+				"away_team_id": "The specified away team does not exist",
+			})
 			return
 		}
 
@@ -89,7 +119,7 @@ func CreateGame(a *app.App) http.HandlerFunc {
 		}
 
 		if err := a.DB.Create(&game).Error; err != nil {
-			http.Error(w, "Error creating game", http.StatusInternalServerError)
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error creating game", "DATABASE_ERROR", nil)
 			return
 		}
 
@@ -109,20 +139,50 @@ func UpdateGame(a *app.App) http.HandlerFunc {
 
 		var game models.Game
 		if err := a.DB.First(&game, gameID).Error; err != nil {
-			http.Error(w, "Game not found", http.StatusNotFound)
+			validation.RespondWithError(w, http.StatusNotFound, "Game not found", "GAME_NOT_FOUND", nil)
 			return
 		}
 
 		var req CreateGameRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			validation.RespondWithError(w, http.StatusBadRequest, "Invalid request body", "INVALID_JSON", nil)
 			return
 		}
 
-		// Parse game time
-		gameTime, err := time.Parse(time.RFC3339, req.GameTime)
-		if err != nil {
-			http.Error(w, "Invalid game_time format", http.StatusBadRequest)
+		// Validate and parse game time
+		gameTime, valErr := validation.ValidateGameTime(req.GameTime)
+		if valErr != nil {
+			validation.RespondWithValidationError(w, valErr)
+			return
+		}
+
+		// Validate game data
+		if valErr := validation.ValidateCreateGame(req.WeekID, req.HomeTeamID, req.AwayTeamID, gameTime, req.HomeSpread, req.Total); valErr != nil {
+			validation.RespondWithValidationError(w, valErr)
+			return
+		}
+
+		// Check that week exists
+		var week models.Week
+		if err := a.DB.First(&week, req.WeekID).Error; err != nil {
+			validation.RespondWithError(w, http.StatusBadRequest, "Week not found", "WEEK_NOT_FOUND", map[string]string{
+				"week_id": "The specified week does not exist",
+			})
+			return
+		}
+
+		// Check that teams exist
+		var homeTeam, awayTeam models.Team
+		if err := a.DB.First(&homeTeam, req.HomeTeamID).Error; err != nil {
+			validation.RespondWithError(w, http.StatusBadRequest, "Home team not found", "TEAM_NOT_FOUND", map[string]string{
+				"home_team_id": "The specified home team does not exist",
+			})
+			return
+		}
+		if err := a.DB.First(&awayTeam, req.AwayTeamID).Error; err != nil {
+			validation.RespondWithError(w, http.StatusBadRequest, "Away team not found", "TEAM_NOT_FOUND", map[string]string{
+				"away_team_id": "The specified away team does not exist",
+			})
 			return
 		}
 
@@ -135,7 +195,7 @@ func UpdateGame(a *app.App) http.HandlerFunc {
 		game.Total = req.Total
 
 		if err := a.DB.Save(&game).Error; err != nil {
-			http.Error(w, "Error updating game", http.StatusInternalServerError)
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error updating game", "DATABASE_ERROR", nil)
 			return
 		}
 
@@ -154,25 +214,29 @@ func DeleteGame(a *app.App) http.HandlerFunc {
 
 		var game models.Game
 		if err := a.DB.First(&game, gameID).Error; err != nil {
-			http.Error(w, "Game not found", http.StatusNotFound)
+			validation.RespondWithError(w, http.StatusNotFound, "Game not found", "GAME_NOT_FOUND", nil)
 			return
 		}
 
 		// Don't allow deleting games that are final or have picks
 		if game.IsFinal {
-			http.Error(w, "Cannot delete a final game", http.StatusForbidden)
+			validation.RespondWithError(w, http.StatusForbidden, "Cannot delete a final game", "GAME_IS_FINAL", map[string]string{
+				"game_id": "This game is marked as final and cannot be deleted",
+			})
 			return
 		}
 
 		var pickCount int64
 		a.DB.Model(&models.Pick{}).Where("game_id = ?", gameID).Count(&pickCount)
 		if pickCount > 0 {
-			http.Error(w, "Cannot delete a game with existing picks", http.StatusForbidden)
+			validation.RespondWithError(w, http.StatusForbidden, "Cannot delete a game with existing picks", "HAS_PICKS", map[string]string{
+				"game_id": "This game has user picks and cannot be deleted",
+			})
 			return
 		}
 
 		if err := a.DB.Delete(&game).Error; err != nil {
-			http.Error(w, "Error deleting game", http.StatusInternalServerError)
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error deleting game", "DATABASE_ERROR", nil)
 			return
 		}
 
@@ -193,19 +257,43 @@ func UpdateGameResult(a *app.App) http.HandlerFunc {
 
 		var req UpdateGameResultRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			validation.RespondWithError(w, http.StatusBadRequest, "Invalid request body", "INVALID_JSON", nil)
 			return
 		}
 
+		// Validate scores
+		homeScore := &req.HomeScore
+		awayScore := &req.AwayScore
+		if valErr := validation.ValidateUpdateGameResult(homeScore, awayScore, req.IsFinal); valErr != nil {
+			validation.RespondWithValidationError(w, valErr)
+			return
+		}
+
+		// Check game exists before starting transaction
 		var game models.Game
 		if err := a.DB.First(&game, gameID).Error; err != nil {
-			http.Error(w, "Game not found", http.StatusNotFound)
+			validation.RespondWithError(w, http.StatusNotFound, "Game not found", "GAME_NOT_FOUND", nil)
 			return
 		}
 
+		// Start transaction for updating game and calculating picks
+		tx := a.DB.Begin()
+		if tx.Error != nil {
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error starting transaction", "DATABASE_ERROR", nil)
+			return
+		}
+
+		// Ensure rollback on panic or error
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+				validation.RespondWithError(w, http.StatusInternalServerError, "Internal server error", "PANIC", nil)
+			}
+		}()
+
 		// Update game result
-		game.HomeScore = &req.HomeScore
-		game.AwayScore = &req.AwayScore
+		game.HomeScore = homeScore
+		game.AwayScore = awayScore
 		game.IsFinal = req.IsFinal
 
 		// Determine winner
@@ -213,21 +301,34 @@ func UpdateGameResult(a *app.App) http.HandlerFunc {
 			game.WinnerTeamID = &game.HomeTeamID
 		} else if req.AwayScore > req.HomeScore {
 			game.WinnerTeamID = &game.AwayTeamID
+		} else {
+			// If tied, WinnerTeamID remains nil
+			game.WinnerTeamID = nil
 		}
-		// If tied, WinnerTeamID remains nil
 
-		if err := a.DB.Save(&game).Error; err != nil {
-			http.Error(w, "Error updating game", http.StatusInternalServerError)
+		if err := tx.Save(&game).Error; err != nil {
+			tx.Rollback()
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error updating game", "DATABASE_ERROR", nil)
 			return
 		}
 
-		// If game is final, calculate pick results
+		// If game is final, calculate pick results within the same transaction
 		if game.IsFinal {
-			if err := calculatePickResults(a.DB, game.ID); err != nil {
-				http.Error(w, "Error calculating pick results", http.StatusInternalServerError)
+			if err := calculatePickResults(tx, game.ID); err != nil {
+				tx.Rollback()
+				validation.RespondWithError(w, http.StatusInternalServerError, "Error calculating pick results", "SCORING_ERROR", nil)
 				return
 			}
 		}
+
+		// Commit transaction
+		if err := tx.Commit().Error; err != nil {
+			validation.RespondWithError(w, http.StatusInternalServerError, "Error committing transaction", "DATABASE_ERROR", nil)
+			return
+		}
+
+		// Reload game with relationships after successful commit
+		a.DB.Preload("HomeTeam").Preload("AwayTeam").Preload("Week").First(&game, game.ID)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(game)
@@ -235,44 +336,62 @@ func UpdateGameResult(a *app.App) http.HandlerFunc {
 }
 
 // calculatePickResults updates all picks for a game once it's final
-func calculatePickResults(db *gorm.DB, gameID uint) error {
+// This function should be called within a transaction
+func calculatePickResults(tx *gorm.DB, gameID uint) error {
 	var game models.Game
-	if err := db.First(&game, gameID).Error; err != nil {
+	if err := tx.First(&game, gameID).Error; err != nil {
 		return err
 	}
 
+	// Verify game has scores and winner
+	if game.HomeScore == nil || game.AwayScore == nil {
+		return nil // Nothing to calculate without scores
+	}
+
 	var picks []models.Pick
-	if err := db.Where("game_id = ?", gameID).Find(&picks).Error; err != nil {
+	if err := tx.Where("game_id = ?", gameID).Find(&picks).Error; err != nil {
 		return err
+	}
+
+	// If no picks, nothing to do
+	if len(picks) == 0 {
+		return nil
 	}
 
 	// Calculate actual total score
 	actualTotal := float64(*game.HomeScore + *game.AwayScore)
 
-	for _, pick := range picks {
+	// Update all picks in a batch
+	for i := range picks {
 		// Check spread pick correctness
-		spreadCorrect := pick.PickedTeamID == *game.WinnerTeamID
-		pick.SpreadCorrect = &spreadCorrect
+		spreadCorrect := false
+		if game.WinnerTeamID != nil {
+			spreadCorrect = picks[i].PickedTeamID == *game.WinnerTeamID
+		}
+		picks[i].SpreadCorrect = &spreadCorrect
 
 		// Check over/under pick correctness
 		var overUnderCorrect bool
-		if pick.PickedOverUnder == "over" {
+		if picks[i].PickedOverUnder == "over" {
 			overUnderCorrect = actualTotal > game.Total
-		} else { // "under"
+		} else if picks[i].PickedOverUnder == "under" {
 			overUnderCorrect = actualTotal < game.Total
 		}
-		pick.OverUnderCorrect = &overUnderCorrect
+		picks[i].OverUnderCorrect = &overUnderCorrect
 
 		// Scoring: 1 point for correct spread, 1 point for correct over/under (max 2 points per game)
-		pick.PointsEarned = 0
+		picks[i].PointsEarned = 0
 		if spreadCorrect {
-			pick.PointsEarned++
+			picks[i].PointsEarned++
 		}
 		if overUnderCorrect {
-			pick.PointsEarned++
+			picks[i].PointsEarned++
 		}
 
-		db.Save(&pick)
+		// Save each pick within the transaction
+		if err := tx.Save(&picks[i]).Error; err != nil {
+			return err
+		}
 	}
 
 	return nil

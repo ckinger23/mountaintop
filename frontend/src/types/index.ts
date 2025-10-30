@@ -22,12 +22,15 @@ export interface Season {
   is_active: boolean;
 }
 
+export type WeekStatus = 'creating' | 'picking' | 'scoring' | 'finished';
+
 export interface Week {
   id: number;
   season_id: number;
   week_number: number;
   name: string;
-  lock_time: string;
+  status: WeekStatus;
+  pick_deadline?: string;
   season?: Season;
 }
 
