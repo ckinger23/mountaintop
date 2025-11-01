@@ -32,8 +32,16 @@ func main() {
 		log.Fatal("Failed to run migrations:", err)
 	}
 
+	// Determine seed mode from environment variable
+	// SEED_MODE=minimal -> only teams and superuser
+	// SEED_MODE=full (or empty) -> teams, superuser, league, season, weeks, games
+	seedMode := database.SeedModeFull // default to full
+	if os.Getenv("SEED_MODE") == "minimal" {
+		seedMode = database.SeedModeMinimal
+	}
+
 	// Seed data (only runs if database is empty)
-	if err := database.SeedData(db); err != nil {
+	if err := database.SeedData(db, seedMode); err != nil {
 		log.Fatal("Failed to seed data:", err)
 	}
 

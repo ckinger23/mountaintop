@@ -147,9 +147,18 @@ func backfillDefaultLeague(db *gorm.DB) error {
 	return nil
 }
 
+// SeedMode determines what data to seed
+type SeedMode string
+
+const (
+	SeedModeMinimal SeedMode = "minimal" // Only teams and superuser
+	SeedModeFull    SeedMode = "full"    // Teams, superuser, league, season, weeks, games
+)
+
 // SeedData adds initial data for testing/development
-func SeedData(db *gorm.DB) error {
-	log.Println("Seeding database with initial data...")
+// mode: "minimal" = teams + superuser only, "full" = teams + superuser + league + season
+func SeedData(db *gorm.DB, mode SeedMode) error {
+	log.Printf("Seeding database with initial data (mode: %s)...", mode)
 
 	// Check if data already exists
 	var count int64
@@ -177,22 +186,24 @@ func SeedData(db *gorm.DB) error {
 
 	log.Printf("Seeded %d teams", len(teams))
 
-	// Seed admin user
-	if err := seedAdminUser(db); err != nil {
+	// Seed admin user (and optionally league based on mode)
+	if err := seedAdminUser(db, mode); err != nil {
 		return fmt.Errorf("failed to seed admin user: %w", err)
 	}
 
-	// Seed development season, weeks, and games
-	if err := seedDevelopmentData(db); err != nil {
-		return fmt.Errorf("failed to seed development data: %w", err)
+	// Only seed development data in full mode
+	if mode == SeedModeFull {
+		if err := seedDevelopmentData(db); err != nil {
+			return fmt.Errorf("failed to seed development data: %w", err)
+		}
 	}
 
 	log.Println("Database seeded successfully")
 	return nil
 }
 
-// seedAdminUser creates a default admin user and their league for local development
-func seedAdminUser(db *gorm.DB) error {
+// seedAdminUser creates a default admin user and optionally their league for local development
+func seedAdminUser(db *gorm.DB, mode SeedMode) error {
 	// Hash the default password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
 	if err != nil {
@@ -215,32 +226,37 @@ func seedAdminUser(db *gorm.DB) error {
 
 	log.Println("Created admin user (email: admin@example.com, password: admin123)")
 
-	// Create a default league owned by admin
-	league := models.League{
-		Name:        "Dev League",
-		Code:        "DEV-2025",
-		Description: "Development/Testing League",
-		OwnerID:     admin.ID,
-		IsPublic:    true,
-		IsActive:    true,
-	}
+	// Only create league in full mode
+	if mode == SeedModeFull {
+		// Create a default league owned by admin
+		league := models.League{
+			Name:        "Dev League",
+			Code:        "DEV-2025",
+			Description: "Development/Testing League",
+			OwnerID:     admin.ID,
+			IsPublic:    true,
+			IsActive:    true,
+		}
 
-	if err := db.Create(&league).Error; err != nil {
-		return fmt.Errorf("failed to create league: %w", err)
-	}
+		if err := db.Create(&league).Error; err != nil {
+			return fmt.Errorf("failed to create league: %w", err)
+		}
 
-	log.Printf("Created league: %s (Code: %s)", league.Name, league.Code)
+		log.Printf("Created league: %s (Code: %s)", league.Name, league.Code)
 
-	// Create admin's membership in their league
-	membership := models.LeagueMembership{
-		LeagueID: league.ID,
-		UserID:   admin.ID,
-		Role:     "owner",
-		JoinedAt: time.Now(),
-	}
+		// Create admin's membership in their league
+		membership := models.LeagueMembership{
+			LeagueID: league.ID,
+			UserID:   admin.ID,
+			Role:     "owner",
+			JoinedAt: time.Now(),
+		}
 
-	if err := db.Create(&membership).Error; err != nil {
-		return fmt.Errorf("failed to create admin membership: %w", err)
+		if err := db.Create(&membership).Error; err != nil {
+			return fmt.Errorf("failed to create admin membership: %w", err)
+		}
+	} else {
+		log.Println("Minimal mode: skipping league creation")
 	}
 
 	return nil

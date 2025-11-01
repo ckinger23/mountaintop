@@ -60,7 +60,7 @@ func Register(a *app.App) http.HandlerFunc {
 			Email:        req.Email,
 			PasswordHash: string(hashedPassword),
 			DisplayName:  req.DisplayName,
-			IsAdmin:      false, // First user could be admin, implement logic as needed
+			IsAdmin:      false, // Will be set to true when user creates a league
 		}
 
 		if err := a.DB.Create(&user).Error; err != nil {
@@ -68,8 +68,8 @@ func Register(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Generate token
-		token, err := middleware.GenerateToken(user.ID, user.Email, user.IsAdmin)
+		// Generate token (new users won't own a league yet, so IsAdmin will be false)
+		token, err := middleware.GenerateToken(user.ID, user.Email, false, user.IsGlobalAdmin)
 		if err != nil {
 			http.Error(w, "Error generating token", http.StatusInternalServerError)
 			return
@@ -106,8 +106,12 @@ func Login(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Generate token
-		token, err := middleware.GenerateToken(user.ID, user.Email, user.IsAdmin)
+		// Check if user owns a league (makes them a league admin)
+		var ownedLeague models.League
+		isLeagueOwner := a.DB.Where("owner_id = ?", user.ID).First(&ownedLeague).Error == nil
+
+		// Generate token with proper admin flags
+		token, err := middleware.GenerateToken(user.ID, user.Email, isLeagueOwner, user.IsGlobalAdmin)
 		if err != nil {
 			http.Error(w, "Error generating token", http.StatusInternalServerError)
 			return
@@ -139,7 +143,11 @@ func GetCurrentUser(a *app.App) http.HandlerFunc {
 
 		// Validate that token claims match current database state
 		// This handles cases where user permissions changed after token was issued
-		if user.Email != claims.Email || user.IsAdmin != claims.IsAdmin {
+		// Check if user owns a league for current state
+		var ownedLeague models.League
+		isLeagueOwner := a.DB.Where("owner_id = ?", user.ID).First(&ownedLeague).Error == nil
+
+		if user.Email != claims.Email || user.IsGlobalAdmin != claims.IsGlobalAdmin || isLeagueOwner != claims.IsAdmin {
 			http.Error(w, "Token claims outdated, please login again", http.StatusUnauthorized)
 			return
 		}

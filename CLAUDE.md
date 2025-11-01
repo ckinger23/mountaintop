@@ -19,7 +19,34 @@ go run cmd/api/main.go
 The backend runs on `http://localhost:8080` and automatically:
 - Creates SQLite database at `./cfb-picks.db` (or path in `DB_PATH` env var)
 - Runs GORM migrations on startup
-- Seeds initial team data if database is empty
+- Seeds initial data if database is empty (see Seed Modes below)
+
+#### Seed Modes
+
+Control what data is seeded on first startup with the `SEED_MODE` environment variable:
+
+**Full Mode (default):**
+```bash
+# No env var needed - full is default
+go run cmd/api/main.go
+# OR explicitly:
+SEED_MODE=full go run cmd/api/main.go
+```
+Seeds:
+- All teams from `data/teams.json`
+- Superuser (email: `admin@example.com`, password: `admin123`)
+- Dev League (Code: `DEV-2025`)
+- 2025 Season with 3 weeks and sample games
+
+**Minimal Mode:**
+```bash
+SEED_MODE=minimal go run cmd/api/main.go
+```
+Seeds only:
+- All teams from `data/teams.json`
+- Superuser (email: `admin@example.com`, password: `admin123`)
+
+Use minimal mode when you want to set up leagues and seasons manually through the UI/API.
 
 Test database queries:
 ```bash

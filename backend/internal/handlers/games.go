@@ -7,25 +7,41 @@ import (
 
 	"github.com/ckinger23/mountaintop/internal/app"
 	"github.com/ckinger23/mountaintop/internal/leaderboard"
+	"github.com/ckinger23/mountaintop/internal/middleware"
 	"github.com/ckinger23/mountaintop/internal/models"
 	"github.com/ckinger23/mountaintop/internal/validation"
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
 )
 
+// canManageLeague checks if a user can manage a specific league
+// Global admins can manage all leagues, league owners can only manage their own
+func canManageLeague(claims *middleware.Claims, leagueOwnerID uint) bool {
+	return claims.IsGlobalAdmin || claims.UserID == leagueOwnerID
+}
+
 // GetGames returns a handler for fetching all games for a specific week
 func GetGames(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		weekID := r.URL.Query().Get("week_id")
+		leagueID := r.URL.Query().Get("league_id")
 
 		var games []models.Game
 		// Preload() loads related data from other tables
 		// only works with Find(), FIrst(), and Scan()
 		// Solves n+1 query problem
-		query := a.DB.Preload("HomeTeam").Preload("AwayTeam").Preload("Week")
+		query := a.DB.Preload("HomeTeam").Preload("AwayTeam").Preload("Week").Preload("Week.Season")
 
 		if weekID != "" {
 			query = query.Where("week_id = ?", weekID)
+		}
+
+		// Filter by league if specified
+		if leagueID != "" {
+			// Join through week -> season to filter by league
+			query = query.Joins("JOIN weeks ON weeks.id = games.week_id").
+				Joins("JOIN seasons ON seasons.id = weeks.season_id").
+				Where("seasons.league_id = ?", leagueID)
 		}
 
 		if err := query.Find(&games).Error; err != nil {
@@ -66,6 +82,12 @@ type CreateGameRequest struct {
 // CreateGame returns a handler for creating a new game (admin only)
 func CreateGame(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		var req CreateGameRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			validation.RespondWithError(w, http.StatusBadRequest, "Invalid request body", "INVALID_JSON", nil)
@@ -85,12 +107,18 @@ func CreateGame(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Check that week exists
+		// Check that week exists and load the season/league
 		var week models.Week
-		if err := a.DB.First(&week, req.WeekID).Error; err != nil {
+		if err := a.DB.Preload("Season.League").First(&week, req.WeekID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusBadRequest, "Week not found", "WEEK_NOT_FOUND", map[string]string{
 				"week_id": "The specified week does not exist",
 			})
+			return
+		}
+
+		// Verify user has permission to manage this league
+		if !canManageLeague(claims, week.Season.League.OwnerID) {
+			validation.RespondWithError(w, http.StatusForbidden, "You don't have permission to manage this league", "FORBIDDEN", nil)
 			return
 		}
 
@@ -135,11 +163,23 @@ func CreateGame(a *app.App) http.HandlerFunc {
 // UpdateGame returns a handler for updating game details (admin only)
 func UpdateGame(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		gameID := chi.URLParam(r, "id")
 
 		var game models.Game
-		if err := a.DB.First(&game, gameID).Error; err != nil {
+		if err := a.DB.Preload("Week.Season.League").First(&game, gameID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusNotFound, "Game not found", "GAME_NOT_FOUND", nil)
+			return
+		}
+
+		// Verify user has permission to manage this league
+		if !canManageLeague(claims, game.Week.Season.League.OwnerID) {
+			validation.RespondWithError(w, http.StatusForbidden, "You don't have permission to manage this league", "FORBIDDEN", nil)
 			return
 		}
 
@@ -210,11 +250,23 @@ func UpdateGame(a *app.App) http.HandlerFunc {
 // DeleteGame returns a handler for deleting a game (admin only)
 func DeleteGame(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		gameID := chi.URLParam(r, "id")
 
 		var game models.Game
-		if err := a.DB.First(&game, gameID).Error; err != nil {
+		if err := a.DB.Preload("Week.Season.League").First(&game, gameID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusNotFound, "Game not found", "GAME_NOT_FOUND", nil)
+			return
+		}
+
+		// Verify user has permission to manage this league
+		if !canManageLeague(claims, game.Week.Season.League.OwnerID) {
+			validation.RespondWithError(w, http.StatusForbidden, "You don't have permission to manage this league", "FORBIDDEN", nil)
 			return
 		}
 
@@ -253,6 +305,12 @@ type UpdateGameResultRequest struct {
 // UpdateGameResult returns a handler for updating the score and determining winner (admin only)
 func UpdateGameResult(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		gameID := chi.URLParam(r, "id")
 
 		var req UpdateGameResultRequest
@@ -269,10 +327,16 @@ func UpdateGameResult(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Check game exists before starting transaction
+		// Check game exists before starting transaction and load league for permission check
 		var game models.Game
-		if err := a.DB.First(&game, gameID).Error; err != nil {
+		if err := a.DB.Preload("Week.Season.League").First(&game, gameID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusNotFound, "Game not found", "GAME_NOT_FOUND", nil)
+			return
+		}
+
+		// Verify user has permission to manage this league
+		if !canManageLeague(claims, game.Week.Season.League.OwnerID) {
+			validation.RespondWithError(w, http.StatusForbidden, "You don't have permission to manage this league", "FORBIDDEN", nil)
 			return
 		}
 

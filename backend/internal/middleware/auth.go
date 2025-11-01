@@ -12,9 +12,10 @@ import (
 var jwtSecret = []byte("your-secret-key-change-this") // TODO: Move to environment variable
 
 type Claims struct {
-	UserID  uint   `json:"user_id"`
-	Email   string `json:"email"`
-	IsAdmin bool   `json:"is_admin"`
+	UserID        uint   `json:"user_id"`
+	Email         string `json:"email"`
+	IsAdmin       bool   `json:"is_admin"`        // Legacy field, kept for backward compatibility
+	IsGlobalAdmin bool   `json:"is_global_admin"` // Superuser with all permissions
 	jwt.RegisteredClaims
 }
 
@@ -23,11 +24,12 @@ type contextKey string
 const UserContextKey contextKey = "user"
 
 // GenerateToken creates a JWT token for a user
-func GenerateToken(userID uint, email string, isAdmin bool) (string, error) {
+func GenerateToken(userID uint, email string, isAdmin bool, isGlobalAdmin bool) (string, error) {
 	claims := Claims{
-		UserID:  userID,
-		Email:   email,
-		IsAdmin: isAdmin,
+		UserID:        userID,
+		Email:         email,
+		IsAdmin:       isAdmin,
+		IsGlobalAdmin: isGlobalAdmin,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -81,7 +83,9 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// AdminMiddleware ensures the user is an admin
+// AdminMiddleware ensures the user is a global admin or league owner
+// Note: This middleware only checks if user has SOME admin privileges
+// Individual handlers should verify league-specific permissions
 func AdminMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := r.Context().Value(UserContextKey).(*Claims)
@@ -90,7 +94,8 @@ func AdminMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !claims.IsAdmin {
+		// Allow global admins OR league owners (IsAdmin is set for league owners)
+		if !claims.IsAdmin && !claims.IsGlobalAdmin {
 			http.Error(w, "Admin access required", http.StatusForbidden)
 			return
 		}

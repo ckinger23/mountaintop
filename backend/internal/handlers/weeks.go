@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/ckinger23/mountaintop/internal/app"
+	"github.com/ckinger23/mountaintop/internal/middleware"
 	"github.com/ckinger23/mountaintop/internal/models"
 	"github.com/ckinger23/mountaintop/internal/validation"
 	"github.com/go-chi/chi/v5"
@@ -16,8 +17,31 @@ type WeekRequest struct {
 	Name       string `json:"name"`
 }
 
+// verifyWeekPermission checks if the user can manage the league that owns the given week
+func verifyWeekPermission(a *app.App, w http.ResponseWriter, claims *middleware.Claims, weekID string) (*models.Week, bool) {
+	var week models.Week
+	if err := a.DB.Preload("Season.League").First(&week, weekID).Error; err != nil {
+		validation.RespondWithError(w, http.StatusNotFound, "Week not found", "WEEK_NOT_FOUND", nil)
+		return nil, false
+	}
+
+	// Verify user has permission to manage this league
+	if !claims.IsGlobalAdmin && week.Season.League.OwnerID != claims.UserID {
+		validation.RespondWithError(w, http.StatusForbidden, "You don't have permission to manage this league", "FORBIDDEN", nil)
+		return nil, false
+	}
+
+	return &week, true
+}
+
 func CreateWeek(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		var req WeekRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			validation.RespondWithError(w, http.StatusBadRequest, "Invalid request body", "INVALID_JSON", nil)
@@ -42,12 +66,18 @@ func CreateWeek(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Check that season exists
+		// Check that season exists and load the league
 		var season models.Season
-		if err := a.DB.First(&season, req.SeasonID).Error; err != nil {
+		if err := a.DB.Preload("League").First(&season, req.SeasonID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusBadRequest, "Season not found", "SEASON_NOT_FOUND", map[string]string{
 				"season_id": "The specified season does not exist",
 			})
+			return
+		}
+
+		// Verify user has permission to manage this league
+		if !claims.IsGlobalAdmin && season.League.OwnerID != claims.UserID {
+			validation.RespondWithError(w, http.StatusForbidden, "You don't have permission to manage this league", "FORBIDDEN", nil)
 			return
 		}
 
@@ -72,12 +102,17 @@ func CreateWeek(a *app.App) http.HandlerFunc {
 // UpdateWeek returns a handler for updating week details (admin only, only for weeks in 'creating' status)
 func UpdateWeek(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		weekID := chi.URLParam(r, "id")
 
-		var week models.Week
-		if err := a.DB.First(&week, weekID).Error; err != nil {
-			validation.RespondWithError(w, http.StatusNotFound, "Week not found", "WEEK_NOT_FOUND", nil)
-			return
+		week, ok := verifyWeekPermission(a, w, claims, weekID)
+		if !ok {
+			return // error already sent by verifyWeekPermission
 		}
 
 		// Only allow editing weeks in 'creating' status
@@ -139,9 +174,20 @@ func UpdateWeek(a *app.App) http.HandlerFunc {
 // OpenWeekForPicks transitions a week from 'creating' to 'picking' status
 func OpenWeekForPicks(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		weekID := chi.URLParam(r, "id")
 
-		var week models.Week
+		week, ok := verifyWeekPermission(a, w, claims, weekID)
+		if !ok {
+			return // error already sent by verifyWeekPermission
+		}
+
+		// Load games for this week
 		if err := a.DB.Preload("Games").First(&week, weekID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusNotFound, "Week not found", "WEEK_NOT_FOUND", nil)
 			return
@@ -193,12 +239,17 @@ func OpenWeekForPicks(a *app.App) http.HandlerFunc {
 // LockWeek transitions a week from 'picking' to 'scoring' status
 func LockWeek(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		weekID := chi.URLParam(r, "id")
 
-		var week models.Week
-		if err := a.DB.First(&week, weekID).Error; err != nil {
-			validation.RespondWithError(w, http.StatusNotFound, "Week not found", "WEEK_NOT_FOUND", nil)
-			return
+		week, ok := verifyWeekPermission(a, w, claims, weekID)
+		if !ok {
+			return // error already sent by verifyWeekPermission
 		}
 
 		// Validate current status
@@ -223,9 +274,20 @@ func LockWeek(a *app.App) http.HandlerFunc {
 // CompleteWeek transitions a week from 'scoring' to 'finished' status
 func CompleteWeek(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := middleware.GetUserFromContext(r)
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		weekID := chi.URLParam(r, "id")
 
-		var week models.Week
+		week, ok := verifyWeekPermission(a, w, claims, weekID)
+		if !ok {
+			return // error already sent by verifyWeekPermission
+		}
+
+		// Load games for this week
 		if err := a.DB.Preload("Games").First(&week, weekID).Error; err != nil {
 			validation.RespondWithError(w, http.StatusNotFound, "Week not found", "WEEK_NOT_FOUND", nil)
 			return
