@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { gamesService, adminService } from '../services/api';
 import { Game, Team, Season, Week, WeekStatus } from '../types';
 import { useAuth } from '../hooks/useAuth';
+import { useLeague } from '../hooks/useLeague';
 import { ChevronDown, ChevronRight, Plus, Edit, Save } from 'lucide-react';
 
 // Game components
@@ -18,6 +19,7 @@ import UpdateWeekModal from '../components/admin/weeks/UpdateWeekModal';
 import CreateSeasonModal from '../components/admin/seasons/CreateSeasonModal';
 
 export default function Admin() {
+  const { currentLeague } = useLeague();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [weeksBySeason, setWeeksBySeason] = useState<Record<number, Week[]>>({});
   const [gamesByWeek, setGamesByWeek] = useState<Record<number, Game[]>>({});
@@ -43,19 +45,27 @@ export default function Admin() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentLeague]);
 
   const loadData = async () => {
+    if (!currentLeague) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const [teamsData, seasonsData] = await Promise.all([
         gamesService.getTeams(),
         gamesService.getSeasons(),
       ]);
       setTeams(teamsData);
-      setSeasons(seasonsData);
 
-      // Load weeks for all seasons
-      const weeksPromises = seasonsData.map(async (season) => {
+      // Filter seasons by current league
+      const leagueSeasons = seasonsData.filter(s => s.league_id === currentLeague.id);
+      setSeasons(leagueSeasons);
+
+      // Load weeks for league seasons only
+      const weeksPromises = leagueSeasons.map(async (season) => {
         const weeks = await gamesService.getWeeks(season.id);
         return { seasonId: season.id, weeks };
       });
@@ -71,7 +81,7 @@ export default function Admin() {
       const newExpandedSeasons = new Set<number>();
       const newExpandedWeeks = new Set<number>();
 
-      seasonsData.forEach((season) => {
+      leagueSeasons.forEach((season) => {
         const weeks = weeksMap[season.id] || [];
         const hasActiveWeeks = weeks.some(
           (w) => w.status === 'creating' || w.status === 'picking' || w.status === 'scoring'
@@ -286,6 +296,17 @@ export default function Admin() {
 
   if (loading) {
     return <div className="text-center py-8">Loading...</div>;
+  }
+
+  if (!currentLeague) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+        <div className="text-center py-8 text-gray-500">
+          Please select or create a league to manage seasons, weeks, and games
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -5,10 +5,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Query builds and executes a leaderboard query with optional season filter
+// Query builds and executes a leaderboard query with optional season and league filters
 type Query struct {
 	db       *gorm.DB
 	seasonID *uint
+	leagueID *uint
 }
 
 // NewQuery creates a new leaderboard query builder
@@ -19,6 +20,12 @@ func NewQuery(db *gorm.DB) *Query {
 // ForSeason filters the leaderboard to a specific season
 func (q *Query) ForSeason(seasonID uint) *Query {
 	q.seasonID = &seasonID
+	return q
+}
+
+// ForLeague filters the leaderboard to a specific league
+func (q *Query) ForLeague(leagueID uint) *Query {
+	q.leagueID = &leagueID
 	return q
 }
 
@@ -48,6 +55,11 @@ func (q *Query) Execute() ([]models.LeaderboardEntry, error) {
 		query = query.Where("w.season_id = ? OR p.id IS NULL", *q.seasonID)
 	}
 
+	// Apply league filter if specified
+	if q.leagueID != nil {
+		query = query.Where("p.league_id = ? OR p.id IS NULL", *q.leagueID)
+	}
+
 	// Group by user and order by points
 	query = query.Group("u.id").Order("total_points DESC")
 
@@ -60,11 +72,15 @@ func (q *Query) Execute() ([]models.LeaderboardEntry, error) {
 }
 
 // GetLeaderboard is a convenience function for the most common use case
-func GetLeaderboard(db *gorm.DB, seasonID *uint) ([]models.LeaderboardEntry, error) {
+func GetLeaderboard(db *gorm.DB, seasonID *uint, leagueID *uint) ([]models.LeaderboardEntry, error) {
 	query := NewQuery(db)
 
 	if seasonID != nil {
 		query = query.ForSeason(*seasonID)
+	}
+
+	if leagueID != nil {
+		query = query.ForLeague(*leagueID)
 	}
 
 	return query.Execute()

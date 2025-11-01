@@ -10,6 +10,7 @@ import (
 )
 
 type CreateSeasonRequest struct {
+	LeagueID uint   `json:"league_id"` // NEW: Which league this season belongs to
 	Year     int    `json:"year"`
 	Name     string `json:"name"` // e.g., "2024 Regular Season"
 	IsActive bool   `json:"is_active"`
@@ -29,16 +30,17 @@ func CreateSeason(a *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Check if season with this year already exists
+		// Check if season with this year already exists for this league
 		var existingSeason models.Season
-		if err := a.DB.Where("year = ?", req.Year).First(&existingSeason).Error; err == nil {
+		if err := a.DB.Where("league_id = ? AND year = ?", req.LeagueID, req.Year).First(&existingSeason).Error; err == nil {
 			validation.RespondWithError(w, http.StatusConflict, "Season already exists", "SEASON_EXISTS", map[string]string{
-				"year": "A season for this year already exists",
+				"year": "A season for this year already exists for this league",
 			})
 			return
 		}
 
 		season := models.Season{
+			LeagueID: req.LeagueID,
 			Year:     req.Year,
 			Name:     req.Name,
 			IsActive: req.IsActive,

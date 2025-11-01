@@ -78,6 +78,15 @@ func main() {
 		// User routes
 		r.Get("/api/auth/me", handlers.GetCurrentUser(application))
 
+		// League management
+		r.Post("/api/leagues", handlers.CreateLeague(application))
+		r.Get("/api/leagues", handlers.GetMyLeagues(application))
+		r.Get("/api/leagues/{id}", handlers.GetLeague(application))
+		r.Put("/api/leagues/{id}", handlers.UpdateLeague(application))
+		r.Delete("/api/leagues/{id}/leave", handlers.LeaveLeague(application))
+		r.Post("/api/leagues/join", handlers.JoinLeague(application))
+		r.Get("/api/leagues/browse", handlers.BrowsePublicLeagues(application))
+
 		// Games
 		r.Get("/api/games", handlers.GetGames(application))
 		r.Get("/api/games/{id}", handlers.GetGame(application))

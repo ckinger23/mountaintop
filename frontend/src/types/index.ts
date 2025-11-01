@@ -4,7 +4,31 @@ export interface User {
   email: string;
   display_name: string;
   is_admin: boolean;
+  is_global_admin?: boolean;
   created_at: string;
+}
+
+export interface League {
+  id: number;
+  name: string;
+  code: string;
+  description: string;
+  owner_id: number;
+  is_public: boolean;
+  is_active: boolean;
+  created_at: string;
+  owner?: User;
+  members?: LeagueMembership[];
+}
+
+export interface LeagueMembership {
+  id: number;
+  league_id: number;
+  user_id: number;
+  role: 'owner' | 'member';
+  joined_at: string;
+  user?: User;
+  league?: League;
 }
 
 export interface Team {
@@ -17,9 +41,11 @@ export interface Team {
 
 export interface Season {
   id: number;
+  league_id: number;
   year: number;
   name: string;
   is_active: boolean;
+  league?: League;
 }
 
 export type WeekStatus = 'creating' | 'picking' | 'scoring' | 'finished';
@@ -53,6 +79,7 @@ export interface Game {
 
 export interface Pick {
   id: number;
+  league_id: number;
   user_id: number;
   game_id: number;
   picked_team_id: number;
@@ -64,9 +91,11 @@ export interface Pick {
   game: Game;
   picked_team: Team;
   user?: User;
+  league?: League;
 }
 
 export interface LeaderboardEntry {
+  league_id?: number;
   user_id: number;
   username: string;
   display_name: string;

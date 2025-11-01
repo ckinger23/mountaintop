@@ -1,18 +1,25 @@
 import { useState, useEffect } from 'react';
 import { leaderboardService } from '../services/api';
 import { LeaderboardEntry } from '../types';
+import { useLeague } from '../hooks/useLeague';
 
 export default function Leaderboard() {
+  const { currentLeague } = useLeague();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadLeaderboard();
-  }, []);
+  }, [currentLeague]);
 
   const loadLeaderboard = async () => {
+    if (!currentLeague) {
+      setLoading(false);
+      return;
+    }
+
     try {
-      const data = await leaderboardService.getLeaderboard();
+      const data = await leaderboardService.getLeaderboard(undefined, currentLeague.id);
       setEntries(data);
     } catch (error) {
       console.error('Error loading leaderboard:', error);
@@ -23,6 +30,17 @@ export default function Leaderboard() {
 
   if (loading) {
     return <div className="text-center py-8">Loading...</div>;
+  }
+
+  if (!currentLeague) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-3xl font-bold mb-6">Leaderboard</h1>
+        <div className="text-center py-8 text-gray-500">
+          Please select or create a league to view the leaderboard
+        </div>
+      </div>
+    );
   }
 
   return (

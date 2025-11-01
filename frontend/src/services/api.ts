@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AuthResponse, User, Game, Pick, Week, Team, LeaderboardEntry, Season } from '../types';
+import { AuthResponse, User, Game, Pick, Week, Team, LeaderboardEntry, Season, League } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -93,8 +93,9 @@ export const gamesService = {
 
 // Picks
 export const picksService = {
-  submitPick: async (gameId: number, pickedTeamId: number, pickedOverUnder: string, confidence?: number): Promise<Pick> => {
+  submitPick: async (leagueId: number, gameId: number, pickedTeamId: number, pickedOverUnder: string, confidence?: number): Promise<Pick> => {
     const { data } = await api.post<Pick>('/picks', {
+      league_id: leagueId,
       game_id: gameId,
       picked_team_id: pickedTeamId,
       picked_over_under: pickedOverUnder,
@@ -103,30 +104,83 @@ export const picksService = {
     return data;
   },
 
-  getMyPicks: async (weekId?: number): Promise<Pick[]> => {
-    const params = weekId ? { week_id: weekId } : {};
+  getMyPicks: async (weekId?: number, leagueId?: number): Promise<Pick[]> => {
+    const params: any = {};
+    if (weekId) params.week_id = weekId;
+    if (leagueId) params.league_id = leagueId;
     const { data } = await api.get<Pick[]>('/picks/me', { params });
     return data;
   },
 
-  getUserPicks: async (userId: number, weekId?: number): Promise<Pick[]> => {
-    const params = weekId ? { week_id: weekId } : {};
+  getUserPicks: async (userId: number, weekId?: number, leagueId?: number): Promise<Pick[]> => {
+    const params: any = {};
+    if (weekId) params.week_id = weekId;
+    if (leagueId) params.league_id = leagueId;
     const { data } = await api.get<Pick[]>(`/picks/user/${userId}`, { params });
     return data;
   },
 
-  getWeekPicks: async (weekId: number): Promise<Pick[]> => {
-    const { data } = await api.get<Pick[]>(`/picks/week/${weekId}`);
+  getWeekPicks: async (weekId: number, leagueId?: number): Promise<Pick[]> => {
+    const params: any = {};
+    if (leagueId) params.league_id = leagueId;
+    const { data } = await api.get<Pick[]>(`/picks/week/${weekId}`, { params });
     return data;
   },
 };
 
 // Leaderboard
 export const leaderboardService = {
-  getLeaderboard: async (seasonId?: number): Promise<LeaderboardEntry[]> => {
-    const params = seasonId ? { season_id: seasonId } : {};
+  getLeaderboard: async (seasonId?: number, leagueId?: number): Promise<LeaderboardEntry[]> => {
+    const params: any = {};
+    if (seasonId) params.season_id = seasonId;
+    if (leagueId) params.league_id = leagueId;
     const { data } = await api.get<LeaderboardEntry[]>('/leaderboard', { params });
     return data;
+  },
+};
+
+// Leagues
+export const leaguesService = {
+  createLeague: async (name: string, description: string, isPublic: boolean): Promise<League> => {
+    const { data } = await api.post<League>('/leagues', {
+      name,
+      description,
+      is_public: isPublic,
+    });
+    return data;
+  },
+
+  getMyLeagues: async (): Promise<League[]> => {
+    const { data } = await api.get<League[]>('/leagues');
+    return data;
+  },
+
+  getLeague: async (id: number): Promise<League> => {
+    const { data } = await api.get<League>(`/leagues/${id}`);
+    return data;
+  },
+
+  updateLeague: async (id: number, name: string, description: string, isPublic: boolean): Promise<League> => {
+    const { data } = await api.put<League>(`/leagues/${id}`, {
+      name,
+      description,
+      is_public: isPublic,
+    });
+    return data;
+  },
+
+  joinLeague: async (code: string): Promise<League> => {
+    const { data } = await api.post<League>('/leagues/join', { code });
+    return data;
+  },
+
+  browsePublicLeagues: async (): Promise<League[]> => {
+    const { data } = await api.get<League[]>('/leagues/browse');
+    return data;
+  },
+
+  leaveLeague: async (id: number): Promise<void> => {
+    await api.delete(`/leagues/${id}/leave`);
   },
 };
 
@@ -207,8 +261,9 @@ export const adminService = {
   },
 
   // Season management
-  createSeason: async (year: number, name: string, isActive: boolean) => {
+  createSeason: async (leagueId: number, year: number, name: string, isActive: boolean) => {
     const { data } = await api.post('/admin/seasons', {
+      league_id: leagueId,
       year,
       name,
       is_active: isActive,

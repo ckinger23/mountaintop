@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { adminService } from '../../../services/api';
+import { useLeague } from '../../../hooks/useLeague';
 import Modal from '../../Modal';
 
 interface CreateSeasonModalProps {
@@ -14,6 +15,7 @@ export default function CreateSeasonModal({
   onClose,
   onSuccess
 }: CreateSeasonModalProps) {
+  const { currentLeague } = useLeague();
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [name, setName] = useState('');
   const [isActive, setIsActive] = useState(true);
@@ -21,9 +23,15 @@ export default function CreateSeasonModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!currentLeague) {
+      toast.error('Please select a league first');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await adminService.createSeason(parseInt(year), name, isActive);
+      await adminService.createSeason(currentLeague.id, parseInt(year), name, isActive);
       toast.success('Season created successfully!');
       onSuccess();
     } catch (error: any) {

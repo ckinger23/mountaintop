@@ -473,6 +473,7 @@ func GetLeaderboard(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get season Id from query param
 		seasonIDStr := r.URL.Query().Get("season_id")
+		leagueIDStr := r.URL.Query().Get("league_id")
 
 		var seasonID *uint
 		if seasonIDStr != "" {
@@ -485,7 +486,18 @@ func GetLeaderboard(a *app.App) http.HandlerFunc {
 			seasonID = &uid
 		}
 
-		entries, err := leaderboard.GetLeaderboard(a.DB, seasonID)
+		var leagueID *uint
+		if leagueIDStr != "" {
+			id, err := strconv.ParseUint(leagueIDStr, 10, 32)
+			if err != nil {
+				http.Error(w, "Invalid league_id parameter", http.StatusBadRequest)
+				return
+			}
+			uid := uint(id)
+			leagueID = &uid
+		}
+
+		entries, err := leaderboard.GetLeaderboard(a.DB, seasonID, leagueID)
 		if err != nil {
 			http.Error(w, "Error fetching leaderboard", http.StatusInternalServerError)
 			return

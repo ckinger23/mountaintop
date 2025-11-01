@@ -12,6 +12,7 @@ import (
 )
 
 type SubmitPickRequest struct {
+	LeagueID        uint   `json:"league_id"`         // NEW: Which league this pick is for
 	GameID          uint   `json:"game_id"`
 	PickedTeamID    uint   `json:"picked_team_id"`
 	PickedOverUnder string `json:"picked_over_under"` // "over" or "under"
@@ -70,9 +71,16 @@ func SubmitPick(a *app.App) http.HandlerFunc {
 			return
 		}
 
+
+	// Verify user is a member of this league
+	var membership models.LeagueMembership
+	if err := a.DB.Where("league_id = ? AND user_id = ?", req.LeagueID, claims.UserID).First(&membership).Error; err != nil {
+		http.Error(w, "You are not a member of this league", http.StatusForbidden)
+		return
+	}
 		// Check if pick already exists
 		var existingPick models.Pick
-		err := a.DB.Where("user_id = ? AND game_id = ?", claims.UserID, req.GameID).First(&existingPick).Error
+		err := a.DB.Where("league_id = ? AND user_id = ? AND game_id = ?", req.LeagueID, claims.UserID, req.GameID).First(&existingPick).Error
 
 		if err == nil {
 			// Update existing pick
@@ -93,6 +101,7 @@ func SubmitPick(a *app.App) http.HandlerFunc {
 
 		// Create new pick
 		pick := models.Pick{
+		LeagueID:        req.LeagueID,
 			UserID:          claims.UserID,
 			GameID:          req.GameID,
 			PickedTeamID:    req.PickedTeamID,
@@ -123,6 +132,7 @@ func GetMyPicks(a *app.App) http.HandlerFunc {
 			return
 		}
 
+		leagueID := r.URL.Query().Get("league_id")
 		weekID := r.URL.Query().Get("week_id")
 
 		var picks []models.Pick
@@ -131,6 +141,11 @@ func GetMyPicks(a *app.App) http.HandlerFunc {
 			Preload("Game.AwayTeam").
 			Preload("Game.Week").
 			Preload("PickedTeam")
+
+		// Filter by league if provided
+		if leagueID != "" {
+			query = query.Where("league_id = ?", leagueID)
+		}
 
 		if weekID != "" {
 			query = query.Joins("JOIN games ON picks.game_id = games.id").
@@ -152,6 +167,7 @@ func GetPicksForUser(a *app.App) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := chi.URLParam(r, "userId")
 		weekID := r.URL.Query().Get("week_id")
+		leagueID := r.URL.Query().Get("league_id")
 
 		var picks []models.Pick
 		query := a.DB.Where("user_id = ?", userID).
@@ -160,6 +176,11 @@ func GetPicksForUser(a *app.App) http.HandlerFunc {
 			Preload("Game.Week").
 			Preload("PickedTeam").
 			Preload("User")
+
+		// Filter by league if provided
+		if leagueID != "" {
+			query = query.Where("league_id = ?", leagueID)
+		}
 
 		if weekID != "" {
 			query = query.Joins("JOIN games ON picks.game_id = games.id").

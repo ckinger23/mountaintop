@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { gamesService, picksService } from '../services/api';
 import { Game } from '../types';
+import { useLeague } from '../hooks/useLeague';
 
 interface GamePick {
   teamId: number;
@@ -8,6 +9,7 @@ interface GamePick {
 }
 
 export default function MakePicks() {
+  const { currentLeague } = useLeague();
   const [games, setGames] = useState<Game[]>([]);
   const [picks, setPicks] = useState<Map<number, GamePick>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -18,16 +20,21 @@ export default function MakePicks() {
   // Effect function runs after component renders
   // cleanup function (empty in this scenario) runs before the effect runs again
   // or when component unmounts
-  // Dependency array (empty here) controls when the effect re-runs
+  // Dependency array controls when the effect re-runs
   // Dependency array: [] -> run once on mount
   // [a, b] -> run on mount and when a or b changes
   // No list -> run on every render (usually avoid this)
   useEffect(() => {
-    // load the data from API once after page renders
+    // load the data from API after page renders or when league changes
     loadData();
-  }, []);
+  }, [currentLeague]);
 
   const loadData = async () => {
+    if (!currentLeague) {
+      setLoading(false);
+      return;
+    }
+
     try {
       // Get current week
       const week = await gamesService.getCurrentWeek();
@@ -36,8 +43,8 @@ export default function MakePicks() {
       const gamesData = await gamesService.getGames(week.id);
       setGames(gamesData);
 
-      // Get user's existing picks
-      const picksData = await picksService.getMyPicks(week.id);
+      // Get user's existing picks for this league
+      const picksData = await picksService.getMyPicks(week.id, currentLeague.id);
 
       // Pre-populate picks map with existing picks
       const picksMap = new Map<number, GamePick>();
@@ -78,6 +85,11 @@ export default function MakePicks() {
   };
 
   const submitAllPicks = async () => {
+    if (!currentLeague) {
+      alert('Please select a league first');
+      return;
+    }
+
     // Validate all games have picks
     const unlocked = games.filter(game => !isPickLocked(game));
     const missingPicks = unlocked.filter(game => !picks.has(game.id));
@@ -90,7 +102,7 @@ export default function MakePicks() {
     try {
       // Submit all picks
       const promises = Array.from(picks.entries()).map(([gameId, pick]) =>
-        picksService.submitPick(gameId, pick.teamId, pick.overUnder)
+        picksService.submitPick(currentLeague.id, gameId, pick.teamId, pick.overUnder)
       );
 
       await Promise.all(promises);
@@ -107,6 +119,17 @@ export default function MakePicks() {
 
   if (loading) {
     return <div className="text-center py-8">Loading...</div>;
+  }
+
+  if (!currentLeague) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <h1 className="text-3xl font-bold mb-6">Make Your Picks</h1>
+        <div className="text-center py-8 text-gray-500">
+          Please select or create a league to start making picks
+        </div>
+      </div>
+    );
   }
 
   return (

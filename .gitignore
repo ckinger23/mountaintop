@@ -76,3 +76,7 @@ coverage/
 *.tmp
 tmp/
 temp/
+
+# Backup files
+*.bak
+*.bak*
